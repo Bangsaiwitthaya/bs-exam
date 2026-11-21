@@ -1,1 +1,1 @@
-window.OMR_API_URL = 'https://YOUR-WORKER.workers.dev';
+window.BS_EXAM_API_URL = "https://bs-exam-api.academicbangsaiwit.workers.dev";
