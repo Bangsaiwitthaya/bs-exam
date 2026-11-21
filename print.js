@@ -1,9 +1,8 @@
 'use strict';
 /** SVG A4 OMR. All geometry is in mm, shared with scanner.js.
  * Fiducial marker centers: (14,14),(196,14),(14,283),(196,283).
- * Bubble centers: x=34 + column*63 + choiceIndex*9.1; y=112 + row*8.25
- * 3 columns, 17 rows per column, 50 answers per OMR page.
- * Student ID: 5 columns x=48+21*d; y=57.5+3.55*digit.
+ * Bubble layout, ID grid and marker coordinates are defined in omr-layout.js.
+ * 1–100 answers on a single A4 page.
  */
 const OMRPrint=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -30,50 +29,40 @@ const OMRPrint=(()=>{
    txt(20,51,`ชั้น ${s.room||'...............'}     รหัสนักเรียน ${s.studentId||'................'}`,3.4)
   ].join('');
  }
- function omrPage(e,st,pageNo,inlineQuestions=[]){
-  const s=st||{},total=Math.ceil(Number(e.numQuestions)/50),start=(pageNo-1)*50,count=Math.min(50,e.numQuestions-start),opts=[...e.choiceSet];
-  const parts=[];
+ function omrPage(e,st){
+  const s=st||{},count=Number(e.numQuestions),opts=[...e.choiceSet];
+  const layout=OMRLayout.forCount(count),idLayout=OMRLayout.student,parts=[];
   for(const [x,y] of [[10,10],[192,10],[10,279],[192,279]])parts.push(rect(x,y,8,8));
   parts.push(header(e,s,'ปรนัย'));
-  parts.push(`<image x="161" y="18" width="27" height="27" href="${qr(`BSOMR2|${e.examId}|${s.studentId||''}|${pageNo}`)}"/>`);
-  parts.push(txt(161,49,'สแกน QR พร้อมช่องฝน',2.6));
-  parts.push(txt(20,59,`แผ่นที่ ${pageNo}/${total}  |  ข้อ ${start+1}–${start+count}`,3.6,'font-weight="700"'));
-  parts.push(txt(20,65,'รหัสนักเรียน 5 หลัก',3.6,'font-weight="700"'));
+  parts.push(`<image x="161" y="18" width="27" height="27" href="${qr(`BSOMR2|${e.examId}|${s.studentId||''}|1`)}"/>`);
+  parts.push(txt(161,49,'QR ระบุชุดสอบและนักเรียน',2.5));
+  parts.push(txt(20,55,'รหัสนักเรียน 5 หลัก · ระบบฝนให้ในแบบรายบุคคล',3.25,'font-weight="700"'));
   const id=String(s.studentId||'').trim(),digits=/^\d{1,5}$/.test(id)?id.padStart(5,'0').split('').map(Number):null;
   for(let d=0;d<5;d++){
-    const x=48+d*21;
-    parts.push(rect(x-4,66,8,5,'#fff'),`<rect x="${n(x-4)}" y="66" width="8" height="5" stroke="#111" stroke-width=".26" fill="none"/>`);
-    parts.push(txt(x,69.9,digits?digits[d]:'',3.3,'text-anchor="middle" font-weight="700"'));
-    for(let r=0;r<10;r++)parts.push(circ(x,73+r*2.65,1.1,!!digits&&digits[d]===r));
+    const x=idLayout.x0+d*idLayout.dx;
+    parts.push(rect(x-4.5,56.5,9,5,'#fff'),`<rect x="${n(x-4.5)}" y="56.5" width="9" height="5" stroke="#111" stroke-width=".3" fill="none"/>`);
+    parts.push(txt(x,60.2,digits?digits[d]:'',3.45,'text-anchor="middle" font-weight="700"'));
+    for(let r=0;r<10;r++)parts.push(circ(x,idLayout.y0+r*idLayout.dy,idLayout.r,!!digits&&digits[d]===r));
   }
-  for(let r=0;r<10;r++)parts.push(txt(34,73.8+r*2.65,r,2.35));
-  parts.push(line(20,102,190,102,'.38','#444'),txt(20,99,'คำชี้แจง: ฝนคำตอบให้ทึบเต็มวงด้วยปากกาสีน้ำเงิน/ดำ หรือดินสอ',3.1));
-  for(let col=0;col<3;col++){
-    const xx=34+col*63;
-    parts.push(txt(xx-15,107,'ข้อ',3.2,'font-weight="700"'));
-    opts.forEach((ch,j)=>parts.push(txt(xx+j*9.1,107,ch,3.0,'text-anchor="middle" font-weight="700"')));
+  for(let r=0;r<10;r++)parts.push(txt(23,61+r*idLayout.dy,r,2.8));
+  parts.push(txt(20,96,'ฝนทึบเต็มวงด้วยดินสอ หรือปากกาสีน้ำเงิน/ดำ',3.25),line(20,98,191,98,'.4','#333'));
+  for(let col=0;col<layout.columns;col++){
+    const base=layout.baseXs[col];
+    parts.push(txt(base-12.0,102,'ข้อ',3.0,'font-weight="700"'));
+    opts.forEach((ch,j)=>parts.push(txt(base+j*layout.choicePitch,102,ch,3.15,'text-anchor="middle" font-weight="700"')));
   }
-  const rowsPerCol=Math.ceil(count/3);
   for(let q=0;q<count;q++){
-    const col=Math.floor(q/rowsPerCol),row=q%rowsPerCol,y=112+row*8.25,x=34+col*63;
-    parts.push(txt(x-15,y+1.15,start+q+1,3.3,'font-weight="700"'));
-    opts.forEach((ch,j)=>parts.push(`<g class="bubble" data-question="${start+q+1}" data-choice="${esc(ch)}">${circ(x+j*9.1,y,3.18)}</g>`));
-  }
-  if(inlineQuestions.length){
-    const essayY=Math.max(128,112+(rowsPerCol-1)*8.25+10);
-    let at=essayY;
-    inlineQuestions.forEach(({question,number,lines})=>{
-      const content=`<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Sarabun,sans-serif;color:#111;font-size:11pt;line-height:1.4;font-weight:600;overflow-wrap:anywhere;white-space:pre-wrap">ข้อ ${number}. ${esc(question)}</div>`;
-      parts.push(`<foreignObject x="20" y="${n(at)}" width="170" height="15">${content}</foreignObject>`);
-      at+=15;
-      for(let r=0;r<lines;r++)parts.push(line(20,at+r*7.5,190,at+r*7.5,'.2','#666'));
-      at+=lines*7.5+5;
+    const pos=layout.position(q,0);
+    parts.push(txt(pos.x-12,pos.y+1.10,q+1,3.0,'font-weight="700"'));
+    opts.forEach((ch,j)=>{
+      const point=layout.position(q,j);
+      parts.push(`<g class="bubble" data-question="${q+1}" data-choice="${esc(ch)}">${circ(point.x,point.y,layout.radius)}</g>`);
     });
   }
-  parts.push(line(20,260,190,260,'.24','#aaa'),txt(20,267,`ชุดข้อสอบ ${String(e.examId).slice(0,8)} · แผ่น ${pageNo}/${total}`,2.9),
-    txt(20,272,'ห้ามตัดหรือย่อขนาดกระดาษ กรุณาพิมพ์ขนาดจริง 100%',2.75));
+  parts.push(line(20,266,190,266,'.24','#aaa'),txt(20,272,`ชุดข้อสอบ ${String(e.examId).slice(0,8)} · 1/1 · ${count} ข้อ`,2.9),
+    txt(20,275.5,'พิมพ์ขนาดจริง 100% ห้ามย่อหน้า/ปรับ Fit to page',2.65));
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="210mm" height="297mm" viewBox="0 0 210 297" role="img" aria-label="กระดาษคำตอบ OMR">${parts.join('')}</svg>`;
-  return `<section class="page omr-page" data-sheet="${pageNo}" data-questions="${count}">${svg}</section>`;
+  return `<section class="page omr-page" data-sheet="1" data-questions="${count}">${svg}</section>`;
  }
  function essayPages(e,s,skip=0){
   const questions=(e.essayQuestions?.length?e.essayQuestions:Array.from({length:Number(e.essayCount)||0},(_,i)=>`คำตอบอัตนัยข้อ ${i+1}`)).slice(skip).map(x=>String(x||''));
@@ -95,25 +84,9 @@ const OMRPrint=(()=>{
   const pages=[];
   students.forEach(st=>{
     const s=st||{};
-    const total=Math.ceil(exam.numQuestions/50);
-    let inlineCount=0,inlineQuestions=[];
-    const questionList=exam.essayQuestions?.length?exam.essayQuestions:Array.from({length:Number(exam.essayCount)||0},(_,i)=>`คำตอบอัตนัยข้อ ${i+1}`);
-    if(exam.essayMode==='same' && questionList.length){
-      const count=Number(exam.numQuestions)-(total-1)*50;
-      const rows=Math.ceil(count/3);
-      const startY=Math.max(128,112+(rows-1)*8.25+10);
-      const lines=Math.min(20,Math.max(2,Number(exam.essayLines)||8));
-      let free=255-startY;
-      for(const question of questionList){
-        const needed=15+lines*7.5+5;
-        if(free<needed)break;
-        inlineQuestions.push({question,number:inlineCount+1,lines});
-        inlineCount++;free-=needed;
-      }
-    }
-    for(let i=1;i<=total;i++)pages.push(omrPage(exam,s,i,i===total?inlineQuestions:[]));
-    // When there is insufficient room on OMR, continue on extra sheet without shrinking bubbles.
-    pages.push(...essayPages(exam,s,inlineCount));
+    pages.push(omrPage(exam,s));
+    // อัตนัยแยกหน้าจาก OMR เพื่อคงแม่แบบ 100 ข้อต่อหนึ่งแผ่นและรักษาความแม่นยำ
+    pages.push(...essayPages(exam,s,0));
   });
   const css=`@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap');
  @page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;color:#111;font-family:'Sarabun',sans-serif} .page{width:210mm;height:297mm;overflow:hidden;position:relative;break-after:page;page-break-after:always;background:#fff} .page:last-child{break-after:auto;page-break-after:auto} .omr-page svg{display:block;width:210mm;height:297mm} .essay-page{padding:18mm 19mm 16mm} .essay-head{line-height:1.7;border-bottom:1px solid #222;padding-bottom:4mm;font-size:11pt}.essay-head strong{font-size:16pt}.essay-instruction{font-weight:700;font-size:11pt;margin:6mm 0}.essay-block{margin:7mm 0}.essay-question{font-size:12pt;font-weight:600;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}.essay-lines{margin-top:3mm}.answer-line{height:8mm;border-bottom:.23mm solid #777}.essay-foot{position:absolute;bottom:14mm;font-size:9pt;right:19mm;color:#555}@media screen{body{background:#e9edf3}.page{margin:12px auto;box-shadow:0 3px 15px #8888}}`;

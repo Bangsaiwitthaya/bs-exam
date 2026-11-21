@@ -1,10 +1,23 @@
 <!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ระบบตรวจและวิเคราะห์ข้อสอบ</title><link rel="stylesheet" href="style.css"></head><body>
-<header class="site-header"><div class="head-inner"><div class="head-brand"><div class="brand-icon" aria-hidden="true">▣</div><div><h1>ระบบตรวจข้อสอบและวิเคราะห์ข้อสอบ</h1><p>โรงเรียนบางไทรวิทยา</p></div></div><nav class="site-nav" aria-label="เมนูหลัก"><a class="active" href="index.html">ตรวจข้อสอบ OMR · กระดาษคำตอบ · คะแนน</a><a href="legacy.html">วิเคราะห์ V3 · แบบร่าง · รายงานย้อนหลัง</a></nav></div></header>
+<header class="site-header"><div class="head-inner"><div class="head-brand"><div class="brand-icon" aria-hidden="true">▣</div><div><h1>ระบบตรวจข้อสอบและวิเคราะห์ข้อสอบ</h1><p>โรงเรียนบางไทรวิทยา</p></div></div><nav class="site-nav" aria-label="เมนูหลัก"><button type="button" class="nav-button active" id="navHome">หน้าหลัก</button><button type="button" class="nav-button" id="navWorkspace">จัดการข้อสอบและตรวจคะแนน</button><a href="legacy.html">กรอกคำตอบเอง · แบบร่าง · ประวัติรายงาน</a></nav></div></header>
 <main>
-<section class="card" id="loginPanel"><h2>เลือกชื่อครูผู้สอน</h2><p class="sub">ใช้รายชื่อจากชีท Teachers (ไม่มีรหัสผ่านตามข้อกำหนด)</p><div class="grid"><label>ครูผู้สอน<select id="teacher"><option>กำลังโหลด...</option></select></label></div><p><button id="login">เข้าใช้งาน</button></p></section>
+<section id="homeDashboard" class="home-dashboard">
+ <div class="home-hero"><div class="eyebrow">ระบบสารสนเทศ • โรงเรียนบางไทรวิทยา</div><h2>ตรวจข้อสอบได้ในระบบเดียว</h2><p>สร้างกระดาษคำตอบ สแกนด้วยมือถือ ดูคะแนนรายคน และวิเคราะห์ข้อสอบอัตโนมัติ โดยไม่ต้องกรอกคำตอบซ้ำ</p><button type="button" id="homeStart" class="button-light">เริ่มจัดการข้อสอบ →</button></div>
+ <h2 class="section-head">เมนูหลัก</h2><div class="feature-grid">
+  <button type="button" class="feature-card" data-target="work"><span class="feature-symbol">▦</span><strong>สร้างชุดข้อสอบ</strong><small>กลางภาค ปลายภาค เลือกได้หลายห้อง และกำหนดเฉลยภายหลัง</small></button>
+  <button type="button" class="feature-card" data-target="work"><span class="feature-symbol">▤</span><strong>พิมพ์กระดาษคำตอบ</strong><small>1–100 ข้อ พร้อมรหัสนักเรียน 5 หลักและ QR บนแผ่น OMR</small></button>
+  <button type="button" class="feature-card" data-target="work"><span class="feature-symbol">▣</span><strong>สแกนตรวจและคะแนน</strong><small>อ่านทีละแผ่น ตรวจซ้ำต้องยืนยัน รวมคะแนนเมื่อครบ</small></button>
+  <button type="button" class="feature-card" data-target="work"><span class="feature-symbol">▥</span><strong>วิเคราะห์ข้อสอบอัตโนมัติ</strong><small>เมื่อสแกนแล้ว ดู p, r, ตัวลวง, KR-20 และคะแนนรายห้อง</small></button>
+  <a class="feature-card" href="legacy.html"><span class="feature-symbol">▧</span><strong>กรอกคำตอบจากตาราง</strong><small>ใช้เมนูวิเคราะห์เดิม หรือ import Excel กรณีไม่ใช้ OMR</small></a>
+  <a class="feature-card" href="legacy.html"><span class="feature-symbol">▤</span><strong>แบบร่างและรายงานย้อนหลัง</strong><small>เปิดผลวิเคราะห์เดิมทั้งหมด โดยไม่ลบข้อมูลเก่า</small></a>
+ </div>
+ <div class="howto card"><h3>สอบ 100 ข้อ ตรวจอย่างไร?</h3><p><b>นักเรียนหนึ่งคนใช้กระดาษ OMR เพียง 1 แผ่น</b> มีข้อ 1–100 บน A4 แนวตั้ง กล้องอ่าน QR รหัสนักเรียน และคำตอบทั้งหมดจากภาพเดียว</p><p>รายงานวิเคราะห์จะคำนวณจากนักเรียนที่ตรวจครบแล้ว และเปิดดูได้จากเมนู <b>คะแนนและวิเคราะห์อัตโนมัติ</b> ของชุดข้อสอบนั้น</p></div>
+</section>
+<section class="card hidden" id="loginPanel"><h2>เลือกชื่อครูผู้สอน</h2><p class="sub">ใช้รายชื่อจากชีท Teachers (ไม่มีรหัสผ่านตามข้อกำหนด)</p><div class="grid"><label>ครูผู้สอน<select id="teacher"><option>กำลังโหลด...</option></select></label></div><p><button id="login">เข้าใช้งาน</button></p></section>
 <div id="workspace" class="hidden">
  <div class="row card"><b id="welcome"></b><span class="grow"></span><button class="secondary" id="logout">ออกจากระบบ</button></div>
- <section class="card"><h2>สร้างชุดข้อสอบ</h2>
+ <div class="work-shortcuts row"><button type="button" class="secondary" data-scroll-to="createCard">สร้างชุดข้อสอบ</button><button type="button" class="secondary" data-scroll-to="examListCard">ชุดข้อสอบที่สร้างแล้ว</button><button type="button" class="secondary" data-scroll-to="currentPanel">สแกน / คะแนน / วิเคราะห์</button></div>
+ <section class="card" id="createCard"><h2>สร้างชุดข้อสอบ</h2>
   <div class="grid">
    <label>ปีการศึกษา<input id="year" type="number" value="2569"></label><label>ภาคเรียน<select id="semester"><option value="1">1</option><option value="2" selected>2</option></select></label>
    <label>ประเภทการสอบ<select id="examType"><option>กลางภาค</option><option>ปลายภาค</option><option>เก็บคะแนน</option><option>อื่น ๆ</option></select></label>
@@ -13,17 +26,28 @@
    <label>ตัวเลือก<select id="choices"><option>กขคง</option><option>กขคงจ</option><option>1234</option><option>12345</option><option>ABCD</option><option>ABCDE</option></select></label>
    <label>อัตนัย (ไม่มีการเก็บคะแนน)<select id="essay"><option value="none">ไม่มี</option><option value="same">อยู่ท้าย OMR (ขึ้นหน้าใหม่หากไม่พอ)</option><option value="separate">แยกกระดาษ</option></select></label>
    <label>จำนวนข้ออัตนัย<input id="essayCount" type="number" min="0" max="20" value="2"></label><label>บรรทัดต่อข้ออัตนัย<input id="essayLines" type="number" min="2" max="20" value="8"></label>
-  </div><div id="essayQuestionsBox" class="essay-questions hidden"></div><p class="sub">ระบบพิมพ์ 1–50 ข้อเป็น 1 แผ่น, 51–100 ข้อเป็น 2 แผ่น OMR; อัตนัยจะอยู่ต่อท้ายช่องฝนเมื่อมีพื้นที่พอ มิฉะนั้นขึ้นหน้าถัดไป โดยไม่มีการบันทึกคะแนนอัตนัย</p><p><button id="loadRooms">โหลดห้องเรียนจากชีท</button></p><div id="rooms" class="row"></div><p><button id="create">สร้างชุดข้อสอบ</button></p>
+  </div><div id="essayQuestionsBox" class="essay-questions hidden"></div><p class="sub">ระบบพิมพ์ 1–100 ข้อเป็นกระดาษ OMR 1 แผ่น; หากมีข้ออัตนัยจะจัดเป็นหน้าถัดไปโดยอัตโนมัติ เพื่อให้ช่องฝนปรนัย 1–100 ข้ออยู่ในหน้าเดียว โดยไม่มีการบันทึกคะแนนอัตนัย</p><p><button id="loadRooms">โหลดห้องเรียนจากชีท</button></p><div id="rooms" class="row"></div><p><button id="create">สร้างชุดข้อสอบ</button></p>
  </section>
- <section class="card"><h2>ชุดข้อสอบของฉัน</h2><button class="secondary" id="reload">โหลดรายการ</button><div id="examList" class="scroll"></div></section>
+ <section class="card" id="examListCard"><h2>ชุดข้อสอบที่สร้างแล้ว</h2><button class="secondary" id="reload">โหลดรายการ</button><div id="examList" class="scroll"></div></section>
  <section class="card hidden" id="currentPanel"><h2 id="examTitle">ชุดข้อสอบ</h2><p id="examMeta" class="sub"></p>
   <div class="row"><button class="secondary" id="printNamed">พิมพ์กระดาษรายบุคคล (ทุกห้อง)</button><button class="secondary" id="printBlank">พิมพ์กระดาษเปล่า</button><label>จำนวนกระดาษเปล่า<input id="blankCount" type="number" min="1" max="100" value="5" style="width:80px"></label></div>
   <h3>เฉลย (ต้องกรอกครบก่อนสแกน)</h3><div id="keyInputs" class="keybox"></div><p><button id="saveKey">บันทึกเฉลย</button></p>
-  <div class="row"><button id="scanStart">เริ่มสแกน OMR</button><button class="secondary" id="scanStop">หยุดกล้อง</button><button class="secondary" id="reportButton">รายงานคะแนนและวิเคราะห์</button><button class="secondary" id="finalize">บันทึกรายงานเข้า V3</button></div>
-  <div id="scanner" class="hidden"><p class="sub">วางกระดาษให้เห็นจุดมาร์กทั้ง 4 มุมและ QR ชัดเจน ถือกล้องให้นิ่งจนระบบตรวจพบ</p><video id="video" autoplay muted playsinline></video><canvas id="capture" class="hidden"></canvas><p><label>หมายเลขแผ่น (ระบบอ่านจาก QR อัตโนมัติ หาก QR ชำรุดเลือกเอง) <select id="manualPage"><option value="1">แผ่น 1</option><option value="2">แผ่น 2</option></select></label> <label><input id="manualPageOverride" type="checkbox"> ยืนยันหมายเลขแผ่นเองเมื่อ QR อ่านไม่ได้ (ใช้เฉพาะกรณีจำเป็น)</label></p><p><label>กรณีกระดาษเปล่า / รหัสไม่ชัด เลือกนักเรียนด้วยตนเอง<select id="manualStudent"><option value="">อ่านจากกระดาษอัตโนมัติ</option></select></label></p><div class="row"><button id="snap">อ่านภาพตอนนี้</button><label><input id="auto" type="checkbox" checked> ตรวจต่อเนื่องอัตโนมัติ</label></div></div>
+  <div class="row"><button id="scanStart">เริ่มสแกน OMR</button><button class="secondary" id="scanStop">หยุดกล้อง</button><button class="secondary" id="reportButton">ดูคะแนนและวิเคราะห์อัตโนมัติ</button><button class="secondary" id="finalize">เก็บผลวิเคราะห์ลงรายงานย้อนหลัง</button></div>
+  <p class="sub">หลังสแกนกระดาษ OMR หนึ่งแผ่น ระบบบันทึกคำตอบและคะแนนเต็มของนักเรียนทันที และนำคำตอบไปวิเคราะห์อัตโนมัติ</p><div id="scanner" class="hidden"><p class="sub">วางกระดาษให้เห็นจุดมาร์กทั้ง 4 มุมและ QR ชัดเจน ถือกล้องให้นิ่งจนระบบตรวจพบ</p><video id="video" autoplay muted playsinline></video><canvas id="capture" class="hidden"></canvas><p><label>หมายเลขแผ่น (ระบบอ่านจาก QR อัตโนมัติ หาก QR ชำรุดเลือกเอง) <select id="manualPage"><option value="1">แผ่น 1/1</option></select></label> <label><input id="manualPageOverride" type="checkbox"> ยืนยันหมายเลขแผ่นเองเมื่อ QR อ่านไม่ได้ (ใช้เฉพาะกรณีจำเป็น)</label></p><p><label>กรณีกระดาษเปล่า / รหัสไม่ชัด เลือกนักเรียนด้วยตนเอง<select id="manualStudent"><option value="">อ่านจากกระดาษอัตโนมัติ</option></select></label></p><div class="row"><button id="snap">อ่านภาพตอนนี้</button><label><input id="auto" type="checkbox" checked> ตรวจต่อเนื่องอัตโนมัติ</label></div></div>
   <div id="scanResult"></div><p><label>กรองรายงานตามห้อง <select id="reportRoom"><option value="">รวมทุกห้อง</option></select></label></p><div id="report" class="scroll"></div>
  </section>
 </div><div id="message" role="status" aria-live="polite">ยังไม่เชื่อมต่อ</div>
 </main>
-<script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script><script async src="https://docs.opencv.org/4.x/opencv.js" id="opencv"></script><script src="app.js"></script><script src="print.js"></script><script src="scanner.js"></script>
+<script>
+(function(){
+ const home=document.getElementById('homeDashboard'),login=document.getElementById('loginPanel'),workspace=document.getElementById('workspace');
+ const navHome=document.getElementById('navHome'),navWork=document.getElementById('navWorkspace');
+ function goHome(){home.classList.remove('hidden');login.classList.add('hidden');workspace.classList.add('hidden');navHome.classList.add('active');navWork.classList.remove('active');window.scrollTo({top:0,behavior:'smooth'});}
+ function goWork(){home.classList.add('hidden');if(typeof S!=='undefined'&&S.teacher){workspace.classList.remove('hidden');login.classList.add('hidden')}else{login.classList.remove('hidden');workspace.classList.add('hidden')};navHome.classList.remove('active');navWork.classList.add('active');window.scrollTo({top:0,behavior:'smooth'});}
+ navHome.addEventListener('click',goHome);navWork.addEventListener('click',goWork);document.getElementById('homeStart').addEventListener('click',goWork);
+ document.querySelectorAll('[data-target="work"]').forEach(b=>b.addEventListener('click',goWork));
+ document.querySelectorAll('[data-scroll-to]').forEach(b=>b.addEventListener('click',()=>{const el=document.getElementById(b.dataset.scrollTo);if(el?.classList.contains('hidden')){document.getElementById('message').textContent='กรุณาเปิดชุดข้อสอบจากรายการด้านบนก่อน';document.getElementById('examListCard').scrollIntoView({behavior:'smooth'})}else el?.scrollIntoView({behavior:'smooth'})}));
+ window.ExamNav={goHome,goWork};
+})();
+</script><script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script><script async src="https://docs.opencv.org/4.x/opencv.js" id="opencv"></script><script src="app.js"></script><script src="omr-layout.js"></script><script src="print.js"></script><script src="scanner.js"></script>
 </body></html>

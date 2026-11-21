@@ -4,7 +4,7 @@
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบวิเคราะห์ข้อสอบ V3</title>
+  <title>วิเคราะห์จากตารางและรายงานย้อนหลัง | โรงเรียนบางไทรวิทยา</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -679,6 +679,7 @@
 <style>/* Unified navigation visual polish */.unified-nav{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}.unified-nav a{display:inline-block;color:#143d85;background:#eaf1fc;border:1px solid #c9daf3;text-decoration:none;padding:9px 13px;border-radius:10px;font-weight:700}.unified-nav a.active{background:#143d85;color:#fff}</style></head>
 
 <body>
+<div class="no-print" style="background:#fff;border-bottom:1px solid #dbe4ef;padding:12px 18px;font-family:Sarabun,sans-serif"><a href="index.html" style="color:#184080;font-weight:700;text-decoration:none">← กลับหน้าหลักระบบตรวจข้อสอบ</a><span style="margin-left:16px;color:#475569">วิเคราะห์จากตาราง • แบบร่าง • รายงานย้อนหลัง</span></div>
 <div class="app"><nav class="unified-nav no-print"><a href="index.html">ตรวจข้อสอบ OMR · กระดาษคำตอบ · คะแนน</a><a href="legacy.html" class="active">วิเคราะห์ V3 · รายงานย้อนหลัง · แบบร่าง</a></nav>
   <div class="topbar no-print">
     <div class="brand">
@@ -691,8 +692,8 @@
   <!-- DASHBOARD -->
   <section id="dashboard-view" class="view active">
     <div class="dashboard-hero">
-      <h2>ภาพรวมระบบวิเคราะห์ข้อสอบ</h2>
-      <p>ดูสถิติภาพรวม เริ่มวิเคราะห์ข้อสอบใหม่ หรือเปิดรายงานย้อนหลังจากจุดเดียว</p>
+      <h2>รายงานวิเคราะห์ข้อสอบย้อนหลัง</h2>
+      <p>ดูสถิติภาพรวม เริ่มวิเคราะห์จากคำตอบที่กรอก หรือเปิดรายงานย้อนหลังจากจุดเดียว</p>
     </div>
 
     <div class="dashboard-stats">
@@ -720,7 +721,7 @@
         <div class="quick-actions">
           <div class="quick-action" onclick="startNewAnalysis()">
             <div class="icon">📊</div>
-            <b>วิเคราะห์ข้อสอบใหม่</b>
+            <b>วิเคราะห์จากคำตอบที่กรอก</b>
             <span>กรอกเฉลยและคำตอบ แล้ววิเคราะห์ P, R, ตัวลวง และ KR-20</span>
           </div>
           <div class="quick-action" onclick="showView('past-results-view')">

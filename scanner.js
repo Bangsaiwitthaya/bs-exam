@@ -50,13 +50,11 @@ function omrReadFrame(canvas,exam){
     return count?dark/count:0;
   }
   const choice=[...exam.choiceSet];let answers=[],uncertain=[];
-  const pageNo=qrPage || Number($('manualPage').value)||1;
-  const start=(pageNo-1)*50;const pageCount=Math.min(50,exam.numQuestions-start);
-  if(pageCount<1)throw Error('หมายเลขแผ่นไม่ถูกต้อง');
+  const pageNo=1;const start=0;const pageCount=Number(exam.numQuestions);
+  if(qrPage && qrPage!==1)throw Error('กระดาษคำตอบเป็นรูปแบบเก่า โปรดพิมพ์ใหม่');
+  const layout=OMRLayout.forCount(pageCount);
   for(let q=0;q<pageCount;q++){ 
-    const rowsPerCol=Math.ceil(pageCount/3);const col=Math.floor(q/rowsPerCol),row=q%rowsPerCol,base=34+col*63,y=112+row*8.25;
-    // bubble center = left+3.6mm, top+2.7mm; sample inside ring
-    const ratios=choice.map((_,j)=>darkRatio(base+j*9.1,y,1.85));
+    const ratios=choice.map((_,j)=>{const pt=layout.position(q,j);return darkRatio(pt.x,pt.y,layout.radius*0.53)});
     const marked=ratios.map((v,i)=>({v,i})).filter(x=>x.v>.30).sort((a,b)=>b.v-a.v);
     if(marked.length===1)answers.push(choice[marked[0].i]);
     else if(marked.length===0 && Math.max(...ratios)<.13)answers.push('');
@@ -65,7 +63,8 @@ function omrReadFrame(canvas,exam){
   // numeric ID grid (5 digits, optional redundancy for named and blank papers)
   let digits='',idReadable=true;
   for(let d=0;d<5;d++){
-    const ratios=Array.from({length:10},(_,r)=>darkRatio(48+d*21,73+r*2.65,.72));
+    const id=OMRLayout.student;
+    const ratios=Array.from({length:10},(_,r)=>darkRatio(id.x0+d*id.dx,id.y0+r*id.dy,id.r*0.64));
     const marked=ratios.map((v,i)=>({v,i})).filter(x=>x.v>.40);
     if(marked.length===1)digits+=marked[0].i;else idReadable=false;
   }
@@ -85,9 +84,7 @@ async function scanFrame(){
   if(read.qrExam && read.qrExam!==S.exam.examId)throw Error('กระดาษเป็นคนละชุดข้อสอบ');
   const matched=read.studentDigits?S.students.filter(s=>s.studentId.padStart(5,'0')===read.studentDigits):[];
   const studentId=read.qrStudent|| (matched.length===1?matched[0].studentId:'') || $('manualStudent').value;
-  if(S.exam.totalPages>1 && !read.qrPage && !$('manualPageOverride').checked)throw Error('อ่าน QR ระบุหมายเลขแผ่นไม่สำเร็จ กรุณาปรับกล้อง หรือยืนยันหมายเลขแผ่นด้วยตนเอง');
-  const pageNo=read.qrPage||Number($('manualPage').value)||1;
-  if(read.qrPage && $('manualPage').value!==String(pageNo))$('manualPage').value=String(pageNo);
+  const pageNo=1;
   if(read.qrStudent && matched.length===1 && matched[0].studentId!==read.qrStudent)throw Error('รหัสวงดำไม่ตรงกับ QR กรุณาตรวจสอบกระดาษ');
   if(!studentId)throw Error('ไม่ทราบรหัสนักเรียน โปรดตรวจ QR / วงดำ หรือเลือกนักเรียนด้วยตนเอง');
   if(read.uncertain.length){message('อ่านไม่ชัดหรือฝนหลายตัวเลือก ข้อ '+read.uncertain.join(', ')+' กรุณาปรับแสงหรือแก้กระดาษ',true);return;}
@@ -107,6 +104,7 @@ async function scanFrame(){
 }
 function showSaved(r){
  $('scanResult').innerHTML=`<div class="card"><div class="sub">บันทึกคะแนนสำเร็จ</div><h3>${esc(r.student.name)} — ${esc(r.student.room)}</h3><div class="score">${r.complete?r.score+' / '+r.fullScore:'แผ่น '+r.pageNo+'/'+r.totalPages+' = '+r.pageScore+' คะแนน'}</div><p class="sub">${r.complete?'ตรวจครบทุกแผ่นแล้ว':'ยังรอแผ่นอื่น จึงยังไม่คิดคะแนนรวม'} • รหัส ${esc(r.student.studentId)} • บันทึกครั้งที่ ${r.revision}</p></div>`;
+ $('scanResult').insertAdjacentHTML('beforeend','<p><button id="viewUpdatedReport" class="secondary">ดูคะแนนและวิเคราะห์อัตโนมัติ</button></p>');$('viewUpdatedReport').onclick=()=>attempt(async()=>{await showReport();$('report').scrollIntoView({behavior:'smooth'})});
  message(`บันทึกแผ่น ${r.pageNo}/${r.totalPages} ของ ${r.student.name} ${r.complete?'รวม '+r.score+'/'+r.fullScore:'รอแผ่นถัดไป'} กรุณายกกระดาษออกก่อนสแกนแผ่นใหม่`);
  try{if(window.speechSynthesis){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(r.complete?'ตรวจครบแล้ว '+r.score+' คะแนน':'บันทึกแผ่นที่ '+r.pageNo+' แล้ว');u.lang='th-TH';u.rate=1.1;window.speechSynthesis.speak(u)}}catch(_){}
 }
