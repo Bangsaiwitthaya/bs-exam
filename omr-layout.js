@@ -2,7 +2,7 @@
 /** A4 coordinates in millimetres, shared between print and scanner. */
 window.OMRLayout=Object.freeze({
  pageSize:100, markers:[[14,14],[196,14],[14,283],[196,283]],
- student:{x0:43,dx:22,y0:63,dy:3.25,r:1.78},
+ student:{x0:139,dx:11.9,y0:47,dy:4.5,r:1.98},
  forCount(total){
   const q=Number(total);
   if(!Number.isInteger(q)||q<1||q>100)throw Error('ต้องมีข้อสอบ 1–100 ข้อ');

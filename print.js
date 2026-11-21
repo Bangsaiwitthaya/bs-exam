@@ -19,33 +19,38 @@ const OMRPrint=(()=>{
    }finally{holder.remove()}
  }
  function header(e,s,subtitle){
-  const name=s.name||'..............................................................';
-  return [
+  const name=s.name||'..............................................';
+  const blank=!s.studentId;
+  const parts=[
    txt(20,23,'โรงเรียนบางไทรวิทยา',5.4,'font-weight="700"'),
-   txt(20,30,'กระดาษคำตอบ'+subtitle+' · '+e.examType,4.0,'font-weight="700"'),
-   txt(20,36,`${e.subjectName} (${e.subjectCode}) · ภาคเรียน ${e.semester}/${e.academicYear}`,3.2),
-   line(20,39,155,39,'.4','#444'),
-   txt(20,45,`ชื่อ–สกุล ${name}`,3.55),
-   txt(20,51,`ชั้น ${s.room||'...............'}     รหัสนักเรียน ${s.studentId||'................'}`,3.4)
-  ].join('');
+   txt(20,30,'กระดาษคำตอบ'+subtitle+' · '+e.examType,3.9,'font-weight="700"'),
+   txt(20,36,`${e.subjectName} (${e.subjectCode}) · ${e.semester}/${e.academicYear}`,3.0),
+   txt(20,43,`ชื่อ–สกุล ${name}`,3.5),
+   txt(20,49,`ชั้น ${s.room||'......................'}`,3.4),
+   txt(20,55,`เลขประจำตัว ${s.studentId||'................'}`,3.45,'font-weight="600"'),
+   line(123,20,123,92,'.35','#999'),
+   txt(130,29,'รหัสนักเรียน 5 หลัก',3.8,'font-weight="700"'),
+   txt(130,34,blank?'กรุณาฝนรหัสให้ครบ 5 หลัก':'ฝนรหัสล่วงหน้าแล้ว',2.7),
+  ];
+  return parts.join('');
  }
  function omrPage(e,st){
   const s=st||{},count=Number(e.numQuestions),opts=[...e.choiceSet];
   const layout=OMRLayout.forCount(count),idLayout=OMRLayout.student,parts=[];
   for(const [x,y] of [[10,10],[192,10],[10,279],[192,279]])parts.push(rect(x,y,8,8));
   parts.push(header(e,s,'ปรนัย'));
-  parts.push(`<image x="161" y="18" width="27" height="27" href="${qr(`BSOMR2|${e.examId}|${s.studentId||''}|1`)}"/>`);
-  parts.push(txt(161,49,'QR ระบุชุดสอบและนักเรียน',2.5));
-  parts.push(txt(20,55,'รหัสนักเรียน 5 หลัก · ระบบฝนให้ในแบบรายบุคคล',3.25,'font-weight="700"'));
+  parts.push(`<image x="20" y="59" width="29" height="29" href="${qr(`BSOMR2|${e.examId}|${s.studentId||''}|1`)}"/>`);
+  parts.push(txt(52,66,'QR ชุดข้อสอบและนักเรียน',3.0),txt(52,73,'สแกนพร้อมช่องคำตอบ',2.8),txt(52,80,'ไม่ต้องสแกน QR แยก',2.7));
+  
   const id=String(s.studentId||'').trim(),digits=/^\d{1,5}$/.test(id)?id.padStart(5,'0').split('').map(Number):null;
   for(let d=0;d<5;d++){
     const x=idLayout.x0+d*idLayout.dx;
-    parts.push(rect(x-4.5,56.5,9,5,'#fff'),`<rect x="${n(x-4.5)}" y="56.5" width="9" height="5" stroke="#111" stroke-width=".3" fill="none"/>`);
-    parts.push(txt(x,60.2,digits?digits[d]:'',3.45,'text-anchor="middle" font-weight="700"'));
+    parts.push(rect(x-4.8,38,9.6,5.5,'#fff'),`<rect x="${n(x-4.8)}" y="38" width="9.6" height="5.5" stroke="#111" stroke-width=".3" fill="none"/>`);
+    parts.push(txt(x,42,digits?digits[d]:'',3.65,'text-anchor="middle" font-weight="700"'));
     for(let r=0;r<10;r++)parts.push(circ(x,idLayout.y0+r*idLayout.dy,idLayout.r,!!digits&&digits[d]===r));
   }
-  for(let r=0;r<10;r++)parts.push(txt(23,61+r*idLayout.dy,r,2.8));
-  parts.push(txt(20,96,'ฝนทึบเต็มวงด้วยดินสอ หรือปากกาสีน้ำเงิน/ดำ',3.25),line(20,98,191,98,'.4','#333'));
+  for(let r=0;r<10;r++)parts.push(txt(129,48+r*idLayout.dy,r,2.9));
+  parts.push(txt(20,95,'ระบายคำตอบให้เต็มวงด้วยดินสอ หรือปากกาสีน้ำเงิน/ดำ',3.2),line(20,98,191,98,'.4','#333'));
   for(let col=0;col<layout.columns;col++){
     const base=layout.baseXs[col];
     parts.push(txt(base-12.0,102,'ข้อ',3.0,'font-weight="700"'));

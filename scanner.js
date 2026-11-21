@@ -6,7 +6,7 @@ async function startCamera(){
  if(!navigator.mediaDevices?.getUserMedia)throw Error('เบราว์เซอร์หรือ HTTPS ไม่รองรับกล้อง');
  if(!window.cv?.Mat||!window.jsQR)throw Error('OpenCV.js / jsQR ยังโหลดไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง');
  stopCamera();S.stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1600},height:{ideal:1200}}});
- $('video').srcObject=S.stream;await $('video').play();$('scanner').classList.remove('hidden');S.lastPaper='';omrCandidate='';omrRepeat=0;message('เปิดกล้องแล้ว วางกระดาษให้อยู่ในภาพทั้งแผ่น');
+ $('video').srcObject=S.stream;await $('video').play();$('scanner').classList.remove('hidden');S.lastPaper='';omrCandidate='';omrRepeat=0;message('เปิดกล้องแล้ว วางกระดาษให้อยู่ในภาพทั้งแผ่น');ExamUI.toast('เปิดกล้องแล้ว พร้อมสแกน','info');
  const loop=async()=>{if(!S.stream)return;if($('auto').checked&&!S.processing){try{await scanFrame()}catch(e){message(e.message||String(e),true)}}if(S.stream)omrLoopId=setTimeout(loop,1100)};loop();
 }
 function stopCamera(){if(omrLoopId)clearTimeout(omrLoopId);omrLoopId=null;if(S.stream)S.stream.getTracks().forEach(t=>t.stop());S.stream=null;$('scanner').classList.add('hidden')}
@@ -96,15 +96,15 @@ async function scanFrame(){
   const result=await api('scan',{examId:S.exam.examId,studentId,pageNo,answers:read.answers});
   if(result.duplicate){
     $('scanResult').innerHTML=`<div class="card"><h3>พบการตรวจซ้ำ</h3><p>${esc(result.student.name)} ${esc(result.student.room)} แผ่น ${pageNo}/${result.totalPages} คะแนนเดิมเฉพาะแผ่น ${esc(result.previous.score)} คะแนน</p><button id="replaceScan" class="warn">ตรวจซ้ำและแทนที่คะแนนเดิม</button> <button id="cancelScan" class="secondary">ยกเลิก</button></div>`;
-    $('replaceScan').onclick=()=>attempt(async()=>{const r=await api('scan',{examId:S.exam.examId,studentId,pageNo,answers:read.answers,replace:true,expectedRevision:result.previous.revision});showSaved(r)});
+    $('replaceScan').onclick=()=>attempt(async()=>{if(!await ExamUI.confirm('ยืนยันการตรวจซ้ำ',`แทนคะแนนเดิมของ ${result.student.name} (${result.previous.score} คะแนน) ด้วยผลสแกนใหม่?`,'ตรวจซ้ำและแทนที่'))return;const r=await api('scan',{examId:S.exam.examId,studentId,pageNo,answers:read.answers,replace:true,expectedRevision:result.previous.revision});showSaved(r)});
     $('cancelScan').onclick=()=>{$('scanResult').innerHTML='';message('ข้ามกระดาษที่ตรวจแล้ว')};
-    message('พบการตรวจซ้ำ: ต้องยืนยันก่อนบันทึก');
+    message('พบการตรวจซ้ำ: ต้องยืนยันก่อนบันทึก');ExamUI.toast('พบกระดาษที่ตรวจแล้ว','warning');
   }else showSaved(result);
  }finally{S.processing=false}
 }
 function showSaved(r){
  $('scanResult').innerHTML=`<div class="card"><div class="sub">บันทึกคะแนนสำเร็จ</div><h3>${esc(r.student.name)} — ${esc(r.student.room)}</h3><div class="score">${r.complete?r.score+' / '+r.fullScore:'แผ่น '+r.pageNo+'/'+r.totalPages+' = '+r.pageScore+' คะแนน'}</div><p class="sub">${r.complete?'ตรวจครบทุกแผ่นแล้ว':'ยังรอแผ่นอื่น จึงยังไม่คิดคะแนนรวม'} • รหัส ${esc(r.student.studentId)} • บันทึกครั้งที่ ${r.revision}</p></div>`;
  $('scanResult').insertAdjacentHTML('beforeend','<p><button id="viewUpdatedReport" class="secondary">ดูคะแนนและวิเคราะห์อัตโนมัติ</button></p>');$('viewUpdatedReport').onclick=()=>attempt(async()=>{await showReport();$('report').scrollIntoView({behavior:'smooth'})});
- message(`บันทึกแผ่น ${r.pageNo}/${r.totalPages} ของ ${r.student.name} ${r.complete?'รวม '+r.score+'/'+r.fullScore:'รอแผ่นถัดไป'} กรุณายกกระดาษออกก่อนสแกนแผ่นใหม่`);
+ ExamUI.toast('บันทึกคะแนน '+r.student.name+' '+r.score+'/'+r.fullScore);message(`บันทึกแผ่น ${r.pageNo}/${r.totalPages} ของ ${r.student.name} ${r.complete?'รวม '+r.score+'/'+r.fullScore:'รอแผ่นถัดไป'} กรุณายกกระดาษออกก่อนสแกนแผ่นใหม่`);
  try{if(window.speechSynthesis){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(r.complete?'ตรวจครบแล้ว '+r.score+' คะแนน':'บันทึกแผ่นที่ '+r.pageNo+' แล้ว');u.lang='th-TH';u.rate=1.1;window.speechSynthesis.speak(u)}}catch(_){}
 }

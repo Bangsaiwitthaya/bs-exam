@@ -1,4 +1,4 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ระบบตรวจและวิเคราะห์ข้อสอบ</title><link rel="stylesheet" href="style.css"></head><body>
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ระบบตรวจและวิเคราะห์ข้อสอบ</title><link rel="stylesheet" href="style.css?v=34"></head><body>
 <header class="site-header"><div class="head-inner"><div class="head-brand"><div class="brand-icon" aria-hidden="true">▣</div><div><h1>ระบบตรวจข้อสอบและวิเคราะห์ข้อสอบ</h1><p>โรงเรียนบางไทรวิทยา</p></div></div><nav class="site-nav" aria-label="เมนูหลัก"><button type="button" class="nav-button active" id="navHome">หน้าหลัก</button><button type="button" class="nav-button" id="navWorkspace">จัดการข้อสอบและตรวจคะแนน</button><a href="legacy.html">กรอกคำตอบเอง · แบบร่าง · ประวัติรายงาน</a></nav></div></header>
 <main>
 <section id="homeDashboard" class="home-dashboard">
@@ -49,5 +49,5 @@
  document.querySelectorAll('[data-scroll-to]').forEach(b=>b.addEventListener('click',()=>{const el=document.getElementById(b.dataset.scrollTo);if(el?.classList.contains('hidden')){document.getElementById('message').textContent='กรุณาเปิดชุดข้อสอบจากรายการด้านบนก่อน';document.getElementById('examListCard').scrollIntoView({behavior:'smooth'})}else el?.scrollIntoView({behavior:'smooth'})}));
  window.ExamNav={goHome,goWork};
 })();
-</script><script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script><script async src="https://docs.opencv.org/4.x/opencv.js" id="opencv"></script><script src="app.js"></script><script src="omr-layout.js"></script><script src="print.js"></script><script src="scanner.js"></script>
+</script><script src="config.js?v=34"></script><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script><script async src="https://docs.opencv.org/4.x/opencv.js" id="opencv"></script><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script><script src="feedback.js"></script><script src="app.js?v=34"></script><script src="omr-layout.js?v=34"></script><script src="print.js?v=34"></script><script src="scanner.js?v=34"></script>
 </body></html>
