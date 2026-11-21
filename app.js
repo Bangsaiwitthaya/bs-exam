@@ -21,9 +21,19 @@ attempt(async()=>{
   message('โหลดรายชื่อครูเรียบร้อย');
 });
 $('loadRooms').onclick=()=>attempt(async()=>{const rooms=await api('listRooms',{academicYear:$('year').value});$('rooms').innerHTML=rooms.map(r=>`<label class="checkroom"><input type="checkbox" value="${esc(r)}"> ${esc(r)}</label>`).join('');message('โหลดห้องเรียน '+rooms.length+' ห้อง')});
+function renderEssayQuestionInputs(){
+ const mode=$('essay').value;
+ const n=mode==='none'?0:Math.min(20,Math.max(0,Number($('essayCount').value)||0));
+ const old=[...document.querySelectorAll('.essay-question')].map(x=>x.value);
+ $('essayQuestionsBox').innerHTML=Array.from({length:n},(_,i)=>`<label class="essay-field">โจทย์อัตนัยข้อ ${i+1}<textarea class="essay-question" rows="2" maxlength="2000" placeholder="พิมพ์คำถามที่จะปรากฏบนกระดาษข้อสอบ">${esc(old[i]||'')}</textarea></label>`).join('');
+ $('essayQuestionsBox').classList.toggle('hidden',!n);
+}
+$('essay').addEventListener('change',renderEssayQuestionInputs);
+$('essayCount').addEventListener('input',renderEssayQuestionInputs);
+renderEssayQuestionInputs();
 $('create').onclick=()=>attempt(async()=>{
   const rooms=[...$('rooms').querySelectorAll('input:checked')].map(x=>x.value);
-  const result=await api('createExam',{academicYear:$('year').value,semester:$('semester').value,examType:$('examType').value,subjectCode:$('code').value.trim(),subjectName:$('subject').value.trim(),rooms,numQuestions:Number($('nq').value),choiceSet:$('choices').value,essayMode:$('essay').value,essayCount:Number($('essayCount').value),essayLines:Number($('essayLines').value)});
+  const result=await api('createExam',{academicYear:$('year').value,semester:$('semester').value,examType:$('examType').value,subjectCode:$('code').value.trim(),subjectName:$('subject').value.trim(),rooms,numQuestions:Number($('nq').value),choiceSet:$('choices').value,essayMode:$('essay').value,essayCount:Number($('essayCount').value),essayLines:Number($('essayLines').value),essayQuestions:[...document.querySelectorAll('.essay-question')].map(x=>x.value.trim())});
   message('สร้างชุดข้อสอบสำเร็จ');await listExams();await openExam(result.examId);
 });
 async function listExams(){

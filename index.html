@@ -1,5 +1,5 @@
 <!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ระบบตรวจและวิเคราะห์ข้อสอบ</title><link rel="stylesheet" href="style.css"></head><body>
-<header><h1>ระบบตรวจข้อสอบและวิเคราะห์ข้อสอบ</h1><nav><a href="legacy.html">วิเคราะห์แบบ V3 / รายงานย้อนหลัง / แบบร่าง</a> · <a href="index.html">OMR / พิมพ์กระดาษ / คะแนน</a></nav><div>โรงเรียนบางไทรวิทยา</div></header>
+<header class="site-header"><div class="head-inner"><div class="head-brand"><div class="brand-icon" aria-hidden="true">▣</div><div><h1>ระบบตรวจข้อสอบและวิเคราะห์ข้อสอบ</h1><p>โรงเรียนบางไทรวิทยา</p></div></div><nav class="site-nav" aria-label="เมนูหลัก"><a class="active" href="index.html">ตรวจข้อสอบ OMR · กระดาษคำตอบ · คะแนน</a><a href="legacy.html">วิเคราะห์ V3 · แบบร่าง · รายงานย้อนหลัง</a></nav></div></header>
 <main>
 <section class="card" id="loginPanel"><h2>เลือกชื่อครูผู้สอน</h2><p class="sub">ใช้รายชื่อจากชีท Teachers (ไม่มีรหัสผ่านตามข้อกำหนด)</p><div class="grid"><label>ครูผู้สอน<select id="teacher"><option>กำลังโหลด...</option></select></label></div><p><button id="login">เข้าใช้งาน</button></p></section>
 <div id="workspace" class="hidden">
@@ -13,7 +13,7 @@
    <label>ตัวเลือก<select id="choices"><option>กขคง</option><option>กขคงจ</option><option>1234</option><option>12345</option><option>ABCD</option><option>ABCDE</option></select></label>
    <label>อัตนัย (ไม่มีการเก็บคะแนน)<select id="essay"><option value="none">ไม่มี</option><option value="same">อยู่ท้าย OMR (ขึ้นหน้าใหม่หากไม่พอ)</option><option value="separate">แยกกระดาษ</option></select></label>
    <label>จำนวนข้ออัตนัย<input id="essayCount" type="number" min="0" max="20" value="2"></label><label>บรรทัดต่อข้ออัตนัย<input id="essayLines" type="number" min="2" max="20" value="8"></label>
-  </div><p class="sub">ระบบพิมพ์ 1–50 ข้อเป็น 1 แผ่น, 51–100 ข้อเป็น 2 แผ่น OMR; แผ่นอัตนัยพิมพ์ต่อท้ายโดยไม่ใช้สแกน</p><p><button id="loadRooms">โหลดห้องเรียนจากชีท</button></p><div id="rooms" class="row"></div><p><button id="create">สร้างชุดข้อสอบ</button></p>
+  </div><div id="essayQuestionsBox" class="essay-questions hidden"></div><p class="sub">ระบบพิมพ์ 1–50 ข้อเป็น 1 แผ่น, 51–100 ข้อเป็น 2 แผ่น OMR; อัตนัยจะอยู่ต่อท้ายช่องฝนเมื่อมีพื้นที่พอ มิฉะนั้นขึ้นหน้าถัดไป โดยไม่มีการบันทึกคะแนนอัตนัย</p><p><button id="loadRooms">โหลดห้องเรียนจากชีท</button></p><div id="rooms" class="row"></div><p><button id="create">สร้างชุดข้อสอบ</button></p>
  </section>
  <section class="card"><h2>ชุดข้อสอบของฉัน</h2><button class="secondary" id="reload">โหลดรายการ</button><div id="examList" class="scroll"></div></section>
  <section class="card hidden" id="currentPanel"><h2 id="examTitle">ชุดข้อสอบ</h2><p id="examMeta" class="sub"></p>

@@ -54,18 +54,18 @@ function omrReadFrame(canvas,exam){
   const start=(pageNo-1)*50;const pageCount=Math.min(50,exam.numQuestions-start);
   if(pageCount<1)throw Error('หมายเลขแผ่นไม่ถูกต้อง');
   for(let q=0;q<pageCount;q++){ 
-    const col=Math.floor(q/25),row=q%25,base=23+col*92,y=93+row*6.7;
+    const rowsPerCol=Math.ceil(pageCount/3);const col=Math.floor(q/rowsPerCol),row=q%rowsPerCol,base=34+col*63,y=112+row*8.25;
     // bubble center = left+3.6mm, top+2.7mm; sample inside ring
-    const ratios=choice.map((_,j)=>darkRatio(base+28+j*10+3.6,y+2.7,1.7));
+    const ratios=choice.map((_,j)=>darkRatio(base+j*9.1,y,1.85));
     const marked=ratios.map((v,i)=>({v,i})).filter(x=>x.v>.30).sort((a,b)=>b.v-a.v);
     if(marked.length===1)answers.push(choice[marked[0].i]);
     else if(marked.length===0 && Math.max(...ratios)<.13)answers.push('');
     else{answers.push('');uncertain.push(q+1)}
   }
-  // numeric ID grid (8 digits, optional redundancy for named and blank papers)
+  // numeric ID grid (5 digits, optional redundancy for named and blank papers)
   let digits='',idReadable=true;
-  for(let d=0;d<8;d++){
-    const ratios=Array.from({length:10},(_,r)=>darkRatio(29+d*14+1.15,58+r*2.8+1.15,.65));
+  for(let d=0;d<5;d++){
+    const ratios=Array.from({length:10},(_,r)=>darkRatio(48+d*21,73+r*2.65,.72));
     const marked=ratios.map((v,i)=>({v,i})).filter(x=>x.v>.40);
     if(marked.length===1)digits+=marked[0].i;else idReadable=false;
   }
@@ -83,7 +83,7 @@ async function scanFrame(){
   if(!read){omrMissing++;if(omrMissing>=2){S.lastPaper='';omrCandidate='';omrRepeat=0;}return;}
   omrMissing=0;
   if(read.qrExam && read.qrExam!==S.exam.examId)throw Error('กระดาษเป็นคนละชุดข้อสอบ');
-  const matched=read.studentDigits?S.students.filter(s=>s.studentId.padStart(8,'0')===read.studentDigits):[];
+  const matched=read.studentDigits?S.students.filter(s=>s.studentId.padStart(5,'0')===read.studentDigits):[];
   const studentId=read.qrStudent|| (matched.length===1?matched[0].studentId:'') || $('manualStudent').value;
   if(S.exam.totalPages>1 && !read.qrPage && !$('manualPageOverride').checked)throw Error('อ่าน QR ระบุหมายเลขแผ่นไม่สำเร็จ กรุณาปรับกล้อง หรือยืนยันหมายเลขแผ่นด้วยตนเอง');
   const pageNo=read.qrPage||Number($('manualPage').value)||1;
