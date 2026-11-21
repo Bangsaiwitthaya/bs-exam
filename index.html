@@ -1,0 +1,29 @@
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ระบบตรวจและวิเคราะห์ข้อสอบ</title><link rel="stylesheet" href="style.css"></head><body>
+<header><h1>ระบบตรวจข้อสอบและวิเคราะห์ข้อสอบ</h1><nav><a href="legacy.html">วิเคราะห์แบบ V3 / รายงานย้อนหลัง / แบบร่าง</a> · <a href="index.html">OMR / พิมพ์กระดาษ / คะแนน</a></nav><div>โรงเรียนบางไทรวิทยา</div></header>
+<main>
+<section class="card" id="loginPanel"><h2>เลือกชื่อครูผู้สอน</h2><p class="sub">ใช้รายชื่อจากชีท Teachers (ไม่มีรหัสผ่านตามข้อกำหนด)</p><div class="grid"><label>ครูผู้สอน<select id="teacher"><option>กำลังโหลด...</option></select></label></div><p><button id="login">เข้าใช้งาน</button></p></section>
+<div id="workspace" class="hidden">
+ <div class="row card"><b id="welcome"></b><span class="grow"></span><button class="secondary" id="logout">ออกจากระบบ</button></div>
+ <section class="card"><h2>สร้างชุดข้อสอบ</h2>
+  <div class="grid">
+   <label>ปีการศึกษา<input id="year" type="number" value="2569"></label><label>ภาคเรียน<select id="semester"><option value="1">1</option><option value="2" selected>2</option></select></label>
+   <label>ประเภทการสอบ<select id="examType"><option>กลางภาค</option><option>ปลายภาค</option><option>เก็บคะแนน</option><option>อื่น ๆ</option></select></label>
+   <label>รหัสวิชา<input id="code" placeholder="ส23103"></label><label>ชื่อวิชา<input id="subject" placeholder="ภูมิศาสตร์"></label>
+   <label>จำนวนข้อปรนัย (1–100)<input id="nq" type="number" min="1" max="100" value="30"></label>
+   <label>ตัวเลือก<select id="choices"><option>กขคง</option><option>กขคงจ</option><option>1234</option><option>12345</option><option>ABCD</option><option>ABCDE</option></select></label>
+   <label>อัตนัย (ไม่มีการเก็บคะแนน)<select id="essay"><option value="none">ไม่มี</option><option value="same">อยู่ท้าย OMR (ขึ้นหน้าใหม่หากไม่พอ)</option><option value="separate">แยกกระดาษ</option></select></label>
+   <label>จำนวนข้ออัตนัย<input id="essayCount" type="number" min="0" max="20" value="2"></label><label>บรรทัดต่อข้ออัตนัย<input id="essayLines" type="number" min="2" max="20" value="8"></label>
+  </div><p class="sub">ระบบพิมพ์ 1–50 ข้อเป็น 1 แผ่น, 51–100 ข้อเป็น 2 แผ่น OMR; แผ่นอัตนัยพิมพ์ต่อท้ายโดยไม่ใช้สแกน</p><p><button id="loadRooms">โหลดห้องเรียนจากชีท</button></p><div id="rooms" class="row"></div><p><button id="create">สร้างชุดข้อสอบ</button></p>
+ </section>
+ <section class="card"><h2>ชุดข้อสอบของฉัน</h2><button class="secondary" id="reload">โหลดรายการ</button><div id="examList" class="scroll"></div></section>
+ <section class="card hidden" id="currentPanel"><h2 id="examTitle">ชุดข้อสอบ</h2><p id="examMeta" class="sub"></p>
+  <div class="row"><button class="secondary" id="printNamed">พิมพ์กระดาษรายบุคคล (ทุกห้อง)</button><button class="secondary" id="printBlank">พิมพ์กระดาษเปล่า</button><label>จำนวนกระดาษเปล่า<input id="blankCount" type="number" min="1" max="100" value="5" style="width:80px"></label></div>
+  <h3>เฉลย (ต้องกรอกครบก่อนสแกน)</h3><div id="keyInputs" class="keybox"></div><p><button id="saveKey">บันทึกเฉลย</button></p>
+  <div class="row"><button id="scanStart">เริ่มสแกน OMR</button><button class="secondary" id="scanStop">หยุดกล้อง</button><button class="secondary" id="reportButton">รายงานคะแนนและวิเคราะห์</button><button class="secondary" id="finalize">บันทึกรายงานเข้า V3</button></div>
+  <div id="scanner" class="hidden"><p class="sub">วางกระดาษให้เห็นจุดมาร์กทั้ง 4 มุมและ QR ชัดเจน ถือกล้องให้นิ่งจนระบบตรวจพบ</p><video id="video" autoplay muted playsinline></video><canvas id="capture" class="hidden"></canvas><p><label>หมายเลขแผ่น (ระบบอ่านจาก QR อัตโนมัติ หาก QR ชำรุดเลือกเอง) <select id="manualPage"><option value="1">แผ่น 1</option><option value="2">แผ่น 2</option></select></label> <label><input id="manualPageOverride" type="checkbox"> ยืนยันหมายเลขแผ่นเองเมื่อ QR อ่านไม่ได้ (ใช้เฉพาะกรณีจำเป็น)</label></p><p><label>กรณีกระดาษเปล่า / รหัสไม่ชัด เลือกนักเรียนด้วยตนเอง<select id="manualStudent"><option value="">อ่านจากกระดาษอัตโนมัติ</option></select></label></p><div class="row"><button id="snap">อ่านภาพตอนนี้</button><label><input id="auto" type="checkbox" checked> ตรวจต่อเนื่องอัตโนมัติ</label></div></div>
+  <div id="scanResult"></div><p><label>กรองรายงานตามห้อง <select id="reportRoom"><option value="">รวมทุกห้อง</option></select></label></p><div id="report" class="scroll"></div>
+ </section>
+</div><div id="message" role="status" aria-live="polite">ยังไม่เชื่อมต่อ</div>
+</main>
+<script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script><script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script><script async src="https://docs.opencv.org/4.x/opencv.js" id="opencv"></script><script src="app.js"></script><script src="print.js"></script><script src="scanner.js"></script>
+</body></html>

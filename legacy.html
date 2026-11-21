@@ -1,0 +1,1712 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบวิเคราะห์ข้อสอบ V3</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --primary:#2563eb;
+      --primary-dark:#1d4ed8;
+      --secondary:#475569;
+      --success:#16a34a;
+      --warning:#d97706;
+      --danger:#dc2626;
+      --bg:#f5f7fb;
+      --card:#ffffff;
+      --border:#e2e8f0;
+      --text:#0f172a;
+      --muted:#64748b;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:'Sarabun',sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+
+    button,input,select{font-family:'Sarabun',sans-serif}
+    button{cursor:pointer}
+
+    .app{
+      max-width:1280px;
+      margin:auto;
+      padding:24px;
+    }
+
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom:22px;
+    }
+
+    .brand h1{margin:0;font-size:26px}
+    .brand p{margin:4px 0 0;color:var(--muted)}
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:18px;
+      box-shadow:0 8px 28px rgba(15,23,42,.06);
+    }
+
+    .dashboard-grid{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:18px;
+    }
+
+    .menu-card{
+      padding:24px;
+      transition:.2s ease;
+      cursor:pointer;
+      min-height:180px;
+    }
+
+    .menu-card:hover{
+      transform:translateY(-3px);
+      box-shadow:0 12px 34px rgba(15,23,42,.1);
+    }
+
+    .menu-icon{
+      width:50px;height:50px;border-radius:14px;
+      display:flex;align-items:center;justify-content:center;
+      background:#eff6ff;font-size:25px;margin-bottom:18px;
+    }
+
+    .menu-card h3{margin:0 0 8px;font-size:19px}
+    .menu-card p{margin:0;color:var(--muted);line-height:1.65}
+
+    .view{display:none}
+    .view.active{display:block}
+
+    .panel{padding:22px;margin-bottom:18px}
+    .panel-title{margin:0 0 18px;font-size:19px}
+
+    .steps{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+
+    .step{
+      padding:9px 14px;
+      border-radius:999px;
+      background:#e2e8f0;
+      color:#475569;
+      font-size:13px;
+      font-weight:600;
+    }
+    .step.active{background:#dbeafe;color:#1d4ed8}
+
+    .form-grid{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:14px;
+    }
+
+    .form-group label{
+      display:block;
+      font-weight:600;
+      margin-bottom:6px;
+    }
+
+    input[type="text"],input[type="number"],select,input[type="file"]{
+      width:100%;
+      padding:11px 12px;
+      border:1px solid #cbd5e1;
+      border-radius:10px;
+      background:white;
+      font-size:14px;
+      outline:none;
+    }
+
+    input:focus,select:focus{
+      border-color:#60a5fa;
+      box-shadow:0 0 0 3px rgba(96,165,250,.15);
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top:18px;
+    }
+
+    .btn{
+      border:0;
+      border-radius:10px;
+      padding:10px 16px;
+      font-weight:700;
+      font-size:14px;
+    }
+
+    .btn-primary{background:var(--primary);color:white}
+    .btn-primary:hover{background:var(--primary-dark)}
+    .btn-success{background:var(--success);color:white}
+    .btn-warning{background:#f59e0b;color:white}
+    .btn-secondary{background:#e2e8f0;color:#334155}
+    .btn-dark{background:#334155;color:white}
+    .btn-outline{background:white;color:#334155;border:1px solid #cbd5e1}
+    .btn-danger{background:var(--danger);color:white}
+
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+
+    .hint{
+      background:#eff6ff;
+      color:#1e3a8a;
+      border-radius:12px;
+      padding:12px 14px;
+      font-size:13px;
+      line-height:1.6;
+    }
+
+    .progress-wrap{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:10px;
+      margin:14px 0;
+    }
+
+    .progress-box{
+      padding:12px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#f8fafc;
+    }
+    .progress-box strong{display:block;font-size:17px}
+    .progress-box span{font-size:12px;color:var(--muted)}
+
+    #input-grid-wrapper{
+      width:100%;
+      max-height:62vh;
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:white;
+    }
+
+    #input-grid{
+      border-collapse:collapse;
+      width:max-content;
+      min-width:100%;
+    }
+
+    #input-grid th,#input-grid td{
+      border:1px solid #e5e7eb;
+      padding:0;
+      text-align:center;
+      min-width:72px;
+      height:38px;
+    }
+
+    #input-grid th{
+      position:sticky;
+      top:0;
+      z-index:4;
+      background:#f8fafc;
+      padding:8px 5px;
+      font-size:13px;
+    }
+
+    .sticky-col{
+      position:sticky!important;
+      left:0;
+      min-width:118px!important;
+      z-index:3;
+      background:white;
+      font-weight:700;
+    }
+
+    thead .sticky-col{z-index:5!important;background:#f8fafc}
+    .answer-key-row .sticky-col{background:#dcfce7}
+    .answer-key-row td{background:#f0fdf4}
+
+    .answer-input{
+      border:0;
+      width:100%;
+      height:100%;
+      text-align:center;
+      font-size:16px;
+      outline:none;
+      background:transparent;
+      text-transform:uppercase;
+    }
+    .answer-input:focus{
+      background:#fef3c7;
+      box-shadow:inset 0 0 0 2px #f59e0b;
+    }
+
+    .summary-grid{
+      display:grid;
+      grid-template-columns:repeat(5,1fr);
+      gap:12px;
+      margin:16px 0;
+    }
+
+    .summary-card{
+      padding:16px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background:white;
+      text-align:center;
+    }
+    .summary-card .value{font-size:25px;font-weight:700}
+    .summary-card .label{font-size:12px;color:var(--muted);margin-top:4px}
+
+    .good{background:#f0fdf4!important}
+    .improve{background:#fffbeb!important}
+    .bad{background:#fef2f2!important}
+
+    .result-table-wrap{
+      width:100%;
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius:12px;
+    }
+
+    .result-table{
+      width:100%;
+      border-collapse:collapse;
+      min-width:900px;
+    }
+    .result-table th,.result-table td{
+      border-bottom:1px solid var(--border);
+      padding:10px 8px;
+      font-size:13px;
+      text-align:center;
+      vertical-align:top;
+    }
+    .result-table th{background:#f8fafc}
+    .reason{font-size:11px;color:var(--muted);margin-top:3px}
+
+    .choice-detail{
+      display:grid;
+      gap:4px;
+      font-size:11px;
+      text-align:left;
+    }
+
+    .result-header{
+      padding:18px;
+      background:#f8fafc;
+      border-radius:14px;
+      margin-bottom:15px;
+      line-height:1.7;
+    }
+
+    .two-col{
+      display:grid;
+      grid-template-columns:1fr 1.4fr;
+      gap:18px;
+      margin-top:18px;
+    }
+
+    .score-list{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:8px;
+      margin-top:10px;
+    }
+
+    .score-chip{
+      border:1px solid var(--border);
+      padding:7px 9px;
+      border-radius:8px;
+      font-size:12px;
+      background:white;
+    }
+
+    .past-card{
+      border:1px solid var(--border);
+      border-radius:14px;
+      margin:12px 0;
+      overflow:hidden;
+    }
+    .past-card-head{
+      padding:14px;
+      background:#f8fafc;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+    }
+    .past-card-body{display:none;padding:16px}
+    .past-card.open .past-card-body{display:block}
+
+
+    .dashboard-hero{
+      background:linear-gradient(135deg,#1d4ed8,#2563eb 55%,#60a5fa);
+      color:white;
+      padding:28px;
+      border-radius:22px;
+      margin-bottom:18px;
+      box-shadow:0 14px 34px rgba(37,99,235,.18);
+    }
+    .dashboard-hero h2{margin:0 0 6px;font-size:25px}
+    .dashboard-hero p{margin:0;opacity:.9;line-height:1.6}
+
+    .dashboard-stats{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:12px;
+      margin-bottom:18px;
+    }
+    .dash-stat{
+      padding:17px;
+      border:1px solid var(--border);
+      border-radius:16px;
+      background:white;
+    }
+    .dash-stat .number{font-size:25px;font-weight:700}
+    .dash-stat .caption{color:var(--muted);font-size:12px;margin-top:3px}
+
+    .dashboard-main{
+      display:grid;
+      grid-template-columns:1.15fr .85fr;
+      gap:18px;
+    }
+
+    .quick-actions{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:12px;
+    }
+    .quick-action{
+      border:1px solid var(--border);
+      border-radius:15px;
+      padding:18px;
+      background:#fff;
+      cursor:pointer;
+      transition:.18s ease;
+    }
+    .quick-action:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(15,23,42,.08)}
+    .quick-action .icon{font-size:24px;margin-bottom:8px}
+    .quick-action b{display:block;margin-bottom:4px}
+    .quick-action span{font-size:12px;color:var(--muted);line-height:1.5}
+
+    .recent-table{
+      width:100%;
+      border-collapse:collapse;
+    }
+    .recent-table th,.recent-table td{
+      border-bottom:1px solid var(--border);
+      padding:10px 8px;
+      text-align:left;
+      font-size:12px;
+      vertical-align:middle;
+    }
+    .recent-table th{color:var(--muted);font-weight:600;background:#f8fafc}
+
+    .report-table{
+      width:100%;
+      border-collapse:collapse;
+      min-width:900px;
+    }
+    .report-table th,.report-table td{
+      padding:11px 9px;
+      border-bottom:1px solid var(--border);
+      font-size:13px;
+      vertical-align:middle;
+    }
+    .report-table th{
+      background:#f8fafc;
+      text-align:left;
+      color:#475569;
+    }
+    .report-table-wrap{
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:white;
+    }
+    .badge-old{
+      display:inline-flex;
+      padding:3px 7px;
+      border-radius:999px;
+      background:#fff7ed;
+      color:#c2410c;
+      font-size:10px;
+      font-weight:700;
+      margin-left:5px;
+    }
+    .teacher-result-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:end;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    .teacher-result-head .form-group{min-width:300px;max-width:480px;flex:1}
+
+    .hidden{display:none!important}
+
+    @media(max-width:900px){
+      .dashboard-grid,.summary-grid,.form-grid,.two-col,.progress-wrap,.dashboard-stats,.dashboard-main,.quick-actions{grid-template-columns:1fr}
+      .score-list{grid-template-columns:repeat(2,1fr)}
+      .app{padding:14px}
+      .topbar{align-items:flex-start}
+    }
+
+    /* =========================================================
+       PRINT: A4 แนวตั้ง
+       บีบตารางให้ครบทุกคอลัมน์โดยไม่ตัดข้อมูลด้านขวา
+       ========================================================= */
+    @page{
+      size:A4 portrait;
+      margin:7mm;
+    }
+
+    @media print{
+      html,body{
+        width:100%;
+        margin:0!important;
+        padding:0!important;
+        background:#fff!important;
+        -webkit-print-color-adjust:exact;
+        print-color-adjust:exact;
+      }
+
+      .no-print{display:none!important}
+
+      /* พิมพ์เฉพาะรายงานที่เลือก */
+      body *{
+        visibility:hidden;
+      }
+      .print-target,
+      .print-target *{
+        visibility:visible;
+      }
+      .print-target{
+        display:block!important;
+        position:absolute;
+        left:0;
+        top:0;
+        width:100%!important;
+        max-width:100%!important;
+        margin:0!important;
+        padding:0!important;
+        border:0!important;
+        box-shadow:none!important;
+      }
+
+      .app{
+        width:100%!important;
+        max-width:none!important;
+        margin:0!important;
+        padding:0!important;
+      }
+
+      .card{
+        box-shadow:none!important;
+        border:0!important;
+        border-radius:0!important;
+      }
+
+      .panel{
+        padding:0!important;
+        margin:0!important;
+      }
+
+      /* ส่วนหัวและการ์ดสรุป */
+      .result-header{
+        margin:0 0 3mm!important;
+        padding:2.5mm 3mm!important;
+        border-radius:2mm!important;
+        font-size:8pt!important;
+        line-height:1.35!important;
+        page-break-inside:avoid;
+        break-inside:avoid;
+      }
+      .result-header h2{
+        font-size:13pt!important;
+        margin:0 0 1.5mm!important;
+      }
+
+      .summary-grid{
+        display:grid!important;
+        grid-template-columns:repeat(5,1fr)!important;
+        gap:1.5mm!important;
+        margin:2mm 0!important;
+        page-break-inside:avoid;
+        break-inside:avoid;
+      }
+      .summary-card{
+        padding:2mm 1mm!important;
+        border-radius:2mm!important;
+        min-width:0!important;
+      }
+      .summary-card .value{
+        font-size:13pt!important;
+        line-height:1.05!important;
+      }
+      .summary-card .label{
+        font-size:6.5pt!important;
+        line-height:1.15!important;
+      }
+
+      .hint{
+        padding:2mm 2.5mm!important;
+        margin:2mm 0!important;
+        border-radius:2mm!important;
+        font-size:7pt!important;
+        line-height:1.3!important;
+        page-break-inside:avoid;
+        break-inside:avoid;
+      }
+
+      /* จุดสำคัญ: ยกเลิก min-width 900px และ overflow ที่ทำให้คอลัมน์ด้านขวาหาย */
+      .result-table-wrap{
+        width:100%!important;
+        max-width:100%!important;
+        overflow:visible!important;
+        border:0!important;
+        border-radius:0!important;
+      }
+
+      .result-table{
+        width:100%!important;
+        max-width:100%!important;
+        min-width:0!important;
+        table-layout:fixed!important;
+        border-collapse:collapse!important;
+      }
+
+      .result-table thead{
+        display:table-header-group;
+      }
+
+      .result-table tr{
+        page-break-inside:avoid;
+        break-inside:avoid;
+      }
+
+      .result-table th,
+      .result-table td{
+        padding:1.1mm .65mm!important;
+        font-size:5.8pt!important;
+        line-height:1.17!important;
+        white-space:normal!important;
+        overflow-wrap:anywhere!important;
+        word-break:break-word!important;
+        vertical-align:top!important;
+        border:0.2mm solid #d9dee7!important;
+      }
+
+      .result-table th{
+        font-size:6.1pt!important;
+        font-weight:700!important;
+      }
+
+      /* ข้อ / เฉลย / สรุป */
+      .result-table th:nth-child(1),
+      .result-table td:nth-child(1){
+        width:4.5%!important;
+      }
+      .result-table th:nth-child(2),
+      .result-table td:nth-child(2){
+        width:5%!important;
+      }
+      .result-table th:last-child,
+      .result-table td:last-child{
+        width:18%!important;
+      }
+
+      .reason{
+        font-size:5.1pt!important;
+        line-height:1.12!important;
+        margin-top:.5mm!important;
+      }
+
+      /* สถิติ + กราฟ ให้อยู่แนวตั้งแบบกะทัดรัด */
+      .two-col{
+        display:grid!important;
+        grid-template-columns:34% 64%!important;
+        gap:2%!important;
+        margin-top:3mm!important;
+        page-break-inside:avoid;
+        break-inside:avoid;
+      }
+
+      .two-col .result-table th,
+      .two-col .result-table td{
+        font-size:7pt!important;
+        padding:1.2mm!important;
+      }
+
+      canvas{
+        max-width:100%!important;
+        max-height:48mm!important;
+      }
+
+      details{
+        margin-top:3mm!important;
+      }
+      details summary{
+        font-size:8pt!important;
+      }
+      details[open]{
+        page-break-inside:auto;
+      }
+
+      .score-list{
+        display:grid!important;
+        grid-template-columns:repeat(4,1fr)!important;
+        gap:1mm!important;
+        margin-top:1.5mm!important;
+      }
+      .score-chip{
+        padding:1mm!important;
+        font-size:6pt!important;
+        border-radius:1mm!important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <div class="topbar no-print">
+    <div class="brand">
+      <h1>ระบบวิเคราะห์ข้อสอบ</h1><p><a href="index.html">← กลับเมนูตรวจ OMR / สร้างชุดข้อสอบ</a></p>
+      <p>วิเคราะห์ค่าความยาก อำนาจจำแนก ตัวลวง และความเชื่อมั่น KR-20</p>
+    </div>
+    <button class="btn btn-outline hidden" id="btn-home" onclick="showView('dashboard-view')">หน้าหลัก</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section id="dashboard-view" class="view active">
+    <div class="dashboard-hero">
+      <h2>ภาพรวมระบบวิเคราะห์ข้อสอบ</h2>
+      <p>ดูสถิติภาพรวม เริ่มวิเคราะห์ข้อสอบใหม่ หรือเปิดรายงานย้อนหลังจากจุดเดียว</p>
+    </div>
+
+    <div class="dashboard-stats">
+      <div class="dash-stat">
+        <div class="number" id="dash-total">-</div>
+        <div class="caption">รายงานทั้งหมด</div>
+      </div>
+      <div class="dash-stat">
+        <div class="number" id="dash-teachers">-</div>
+        <div class="caption">ครูที่มีผลวิเคราะห์</div>
+      </div>
+      <div class="dash-stat">
+        <div class="number" id="dash-current">-</div>
+        <div class="caption" id="dash-current-label">รายงานปีการศึกษาปัจจุบัน</div>
+      </div>
+      <div class="dash-stat">
+        <div class="number" id="dash-kr">-</div>
+        <div class="caption">KR-20 เฉลี่ยจากข้อมูลทั้งหมด</div>
+      </div>
+    </div>
+
+    <div class="dashboard-main">
+      <div class="card panel">
+        <h2 class="panel-title">เมนูใช้งาน</h2>
+        <div class="quick-actions">
+          <div class="quick-action" onclick="startNewAnalysis()">
+            <div class="icon">📊</div>
+            <b>วิเคราะห์ข้อสอบใหม่</b>
+            <span>กรอกเฉลยและคำตอบ แล้ววิเคราะห์ P, R, ตัวลวง และ KR-20</span>
+          </div>
+          <div class="quick-action" onclick="showView('past-results-view')">
+            <div class="icon">📚</div>
+            <b>รายงานย้อนหลัง</b>
+            <span>เลือกชื่อครูครั้งเดียว แล้วระบบแสดงรายงานทั้งหมดเป็นตาราง</span>
+          </div>
+          <div class="quick-action" onclick="openDraftView()">
+            <div class="icon">💾</div>
+            <b>ทำแบบร่างต่อ</b>
+            <span>โหลดข้อมูลที่บันทึกค้างไว้ตามวิชา ครู ปี ภาคเรียน และชั้น</span>
+          </div>
+          <div class="quick-action" onclick="showView('past-results-view')">
+            <div class="icon">🗂️</div>
+            <b>ข้อมูลเดิม</b>
+            <span>รายงานจากระบบเวอร์ชันเดิมยังเปิดดูได้ และระบบเติมสรุปให้ตอนเปิดรายงาน</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card panel">
+        <h2 class="panel-title">รายงานล่าสุด</h2>
+        <div style="overflow:auto">
+          <table class="recent-table">
+            <thead><tr><th>วิชา</th><th>ครู</th><th>ปี/ภาค</th></tr></thead>
+            <tbody id="dashboard-recent">
+              <tr><td colspan="3" style="color:var(--muted)">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANALYSIS -->
+  <section id="analysis-view" class="view">
+    <div class="steps no-print">
+      <div class="step active" id="step1">1 ข้อมูลข้อสอบ</div>
+      <div class="step" id="step2">2 กรอกคำตอบ</div>
+      <div class="step" id="step3">3 ผลวิเคราะห์</div>
+    </div>
+
+    <div class="card panel no-print" id="form-panel">
+      <h2 class="panel-title">ข้อมูลข้อสอบ</h2>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>ภาคเรียน</label>
+          <select id="semester">
+            <option value="1">ภาคเรียนที่ 1</option>
+            <option value="2">ภาคเรียนที่ 2</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>ปีการศึกษา</label>
+          <input type="number" id="academicYear">
+        </div>
+
+        <div class="form-group">
+          <label>ชื่อวิชา</label>
+          <input type="text" id="subjectName" placeholder="เช่น สังคมศึกษา 5">
+        </div>
+
+        <div class="form-group">
+          <label>รหัสวิชา</label>
+          <input type="text" id="subjectCode" placeholder="เช่น ส33101">
+        </div>
+
+        <div class="form-group">
+          <label>ระดับชั้น / ห้อง</label>
+          <input type="text" id="gradeLevel" placeholder="เช่น ม.6/1">
+        </div>
+
+        <div class="form-group">
+          <label>ครูผู้สอน</label>
+          <select id="teacherName">
+            <option value="">-- เลือกครู --</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>รูปแบบคำตอบ</label>
+          <select id="answerSet">
+            <option value="">-- เลือก --</option>
+            <option value="กขคงจ">ก ข ค ง จ</option>
+            <option value="ABCDE">A B C D E</option>
+            <option value="12345">1 2 3 4 5</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>จำนวนข้อสอบ</label>
+          <input type="number" id="numQuestions" min="1" value="20">
+        </div>
+
+        <div class="form-group">
+          <label>จำนวนนักเรียน</label>
+          <input type="number" id="numStudents" min="1" value="10">
+        </div>
+
+        <div class="form-group">
+          <label>นำเข้า Excel</label>
+          <input type="file" id="excel-upload" accept=".xlsx,.xls">
+        </div>
+      </div>
+
+      <div class="hint" style="margin-top:14px">
+        Excel: ระบบจะอ่านแถวแรกเป็นหัวตารางและคอลัมน์แรกเป็นชื่อ/เลขนักเรียน จากนั้นนำคำตอบตั้งแต่คอลัมน์ที่ 2 เป็นต้นไป
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" onclick="generateInputGrid()">สร้างตารางคำตอบ</button>
+        <button class="btn btn-outline" onclick="importExcel()">นำเข้า Excel</button>
+        <button class="btn btn-warning" onclick="loadDraftFromForm()">โหลดร่างของรายการนี้</button>
+      </div>
+    </div>
+
+    <div class="card panel hidden" id="grid-panel">
+      <div class="no-print" style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+        <div>
+          <h2 class="panel-title" style="margin-bottom:4px">กรอกเฉลยและคำตอบนักเรียน</h2>
+          <div style="color:var(--muted);font-size:13px">รองรับการวางข้อมูลหลายช่องด้วย Ctrl+V</div>
+        </div>
+        <button class="btn btn-outline" onclick="backToForm()">กลับข้อมูลข้อสอบ</button>
+      </div>
+
+      <div class="progress-wrap no-print">
+        <div class="progress-box">
+          <strong id="progress-key">0/0</strong>
+          <span>เฉลยที่กรอกแล้ว</span>
+        </div>
+        <div class="progress-box">
+          <strong id="progress-students">0/0</strong>
+          <span>นักเรียนที่มีคำตอบ</span>
+        </div>
+        <div class="progress-box">
+          <strong id="progress-cells">0%</strong>
+          <span>ความสมบูรณ์ของข้อมูล</span>
+        </div>
+      </div>
+
+      <div class="hint no-print" style="margin-bottom:12px">
+        คลิกช่องแรกแล้ววางข้อมูลจาก Excel หรือ Google Sheets ได้ทันที ระบบจะกระจายข้อมูลลงหลายช่องตามแถวและคอลัมน์
+      </div>
+
+      <div id="input-grid-wrapper">
+        <table id="input-grid"></table>
+      </div>
+
+      <div class="actions no-print">
+        <button class="btn btn-warning" onclick="saveDraft()">บันทึกร่าง</button>
+        <button class="btn btn-secondary" onclick="runAnalysis(false)">วิเคราะห์อย่างเดียว</button>
+        <button class="btn btn-success" onclick="runAnalysis(true)">วิเคราะห์และบันทึก</button>
+      </div>
+    </div>
+
+    <div id="results-section"></div>
+  </section>
+
+  <!-- PAST RESULTS -->
+  <section id="past-results-view" class="view">
+    <div class="card panel no-print">
+      <div class="teacher-result-head">
+        <div class="form-group">
+          <label>เลือกครูผู้สอน</label>
+          <select id="searchTeacherName" onchange="loadTeacherReports()">
+            <option value="">-- เลือกครู --</option>
+          </select>
+        </div>
+        <div style="color:var(--muted);font-size:13px">
+          เลือกชื่อครูแล้วจะแสดงผลวิเคราะห์ทั้งหมดทันที
+        </div>
+      </div>
+
+      <div id="teacher-report-summary" class="hint hidden"></div>
+
+      <div class="report-table-wrap" style="margin-top:14px">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>วันที่บันทึก</th>
+              <th>รหัสวิชา / รายวิชา</th>
+              <th>ระดับชั้น</th>
+              <th>ภาคเรียน / ปี</th>
+              <th>ข้อ / คน</th>
+              <th>KR-20</th>
+              <th style="text-align:center">รายงาน</th>
+            </tr>
+          </thead>
+          <tbody id="teacher-report-tbody">
+            <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">กรุณาเลือกครูผู้สอน</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="config.js"></script>
+<script>
+// Compatibility layer for Google Apps Script UI -> GitHub Pages API (V3 functions)
+// No code of the original V3 rendering methods is removed.
+window.google={script:{run:new Proxy({}, {
+  get(_target,method){
+    if(method==='withSuccessHandler')return (success)=>new Proxy({}, {
+      get(_t,n){if(n==='withFailureHandler')return (failure)=>new Proxy({}, {
+        get(_u,fn){return (...args)=>v3Call(fn,args,success,failure)}
+      });return (...args)=>v3Call(n,args,success,console.error)}
+    });
+    return (...args)=>v3Call(method,args,()=>{},console.error);
+  }
+})}};
+async function v3Call(method,args,success,failure){
+  try{
+    const url=window.OMR_API_URL;
+    if(!url||url.includes('YOUR-WORKER'))throw Error('กรุณาตั้งค่า config.js ก่อน');
+    // V3 routes need no teacher login, but API uses selected existing Teacher for request context.
+    const teachers=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'teachers',data:{}})}).then(r=>r.json());
+    if(!teachers.ok)throw Error(teachers.error||'อ่านรายชื่อครูไม่สำเร็จ');
+    const chosen=document.querySelector('#teacherName')?.value||document.querySelector('#searchTeacherName')?.value||teachers.data[0];
+    if(!chosen)throw Error('ยังไม่มีรายชื่อครูในชีท Teachers');
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'v3',teacher:chosen,data:{method,args}})});
+    const v=await r.json();if(!r.ok||!v.ok)throw Error(v.error||'V3 API error');
+    success(v.data);
+  }catch(e){failure(e)}
+}
+</script>
+<script>
+const $ = id => document.getElementById(id);
+let answerSet = '';
+let currentCharts = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  showLoader(true);
+  google.script.run
+    .withSuccessHandler(data => {
+      $('academicYear').value = data.defaultAcademicYear;
+      fillTeacherSelect('teacherName', data.teachers);
+      fillTeacherSelect('searchTeacherName', data.teachers);
+      renderDashboard(data.dashboard || {});
+      showLoader(false);
+    })
+    .withFailureHandler(showError)
+    .getInitialData();
+});
+
+function fillTeacherSelect(id, teachers){
+  const el = $(id);
+  el.innerHTML = '<option value="">-- เลือกครู --</option>';
+  teachers.forEach(t => el.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`));
+}
+
+function renderDashboard(d){
+  $('dash-total').textContent = d.totalReports ?? 0;
+  $('dash-teachers').textContent = d.totalTeachers ?? 0;
+  $('dash-current').textContent = d.currentYearCount ?? 0;
+  $('dash-kr').textContent = d.averageKr20 ?? '-';
+  $('dash-current-label').textContent = `รายงานปีการศึกษา ${d.currentAcademicYear ?? ''}`;
+
+  const recent = d.recent || [];
+  $('dashboard-recent').innerHTML = recent.length
+    ? recent.map(r => `
+        <tr>
+          <td>
+            <b>${escapeHtml(r.subjectName)}</b>
+            <div style="color:var(--muted);font-size:11px">${escapeHtml(r.gradeLevel)}</div>
+          </td>
+          <td>${escapeHtml(r.teacherName)}</td>
+          <td>${escapeHtml(r.academicYear)}/${escapeHtml(r.semester)}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="3" style="color:var(--muted)">ยังไม่มีข้อมูล</td></tr>';
+}
+
+function showView(id){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  $(id).classList.add('active');
+  $('btn-home').classList.toggle('hidden', id === 'dashboard-view');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function startNewAnalysis(){
+  showView('analysis-view');
+  setStep(1);
+  $('form-panel').classList.remove('hidden');
+  $('grid-panel').classList.add('hidden');
+  $('results-section').innerHTML = '';
+}
+
+function openDraftView(){
+  showView('analysis-view');
+  setStep(1);
+  $('form-panel').classList.remove('hidden');
+  $('grid-panel').classList.add('hidden');
+  Swal.fire('โหลดแบบร่าง','กรอก รหัสวิชา ครู ปีการศึกษา ภาคเรียน และระดับชั้น แล้วกด “โหลดร่างของรายการนี้”','info');
+}
+
+function setStep(n){
+  [1,2,3].forEach(i => $('step'+i).classList.toggle('active', i===n));
+}
+
+function showLoader(show){
+  if(show){
+    Swal.fire({
+      title:'กำลังประมวลผล',
+      html:'กรุณารอสักครู่...',
+      allowOutsideClick:false,
+      didOpen:()=>Swal.showLoading()
+    });
+  }else{
+    Swal.close();
+  }
+}
+
+function showError(error){
+  showLoader(false);
+  Swal.fire('เกิดข้อผิดพลาด', error && error.message ? error.message : String(error), 'error');
+}
+
+function escapeHtml(text){
+  return String(text ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
+
+function getFormDataBase(){
+  return {
+    semester:$('semester').value,
+    academicYear:$('academicYear').value.trim(),
+    subjectName:$('subjectName').value.trim(),
+    subjectCode:$('subjectCode').value.trim(),
+    gradeLevel:$('gradeLevel').value.trim(),
+    teacherName:$('teacherName').value,
+    answerSet:$('answerSet').value,
+    numQuestions:parseInt($('numQuestions').value)||0,
+    numStudents:parseInt($('numStudents').value)||0
+  };
+}
+
+function validateBaseForm(){
+  const d = getFormDataBase();
+  if(!d.semester || !d.academicYear || !d.subjectName || !d.subjectCode || !d.gradeLevel || !d.teacherName || !d.answerSet){
+    Swal.fire('ข้อมูลไม่ครบ','กรุณากรอกข้อมูลข้อสอบและเลือกรูปแบบคำตอบให้ครบ','warning');
+    return false;
+  }
+  if(d.numQuestions<=0 || d.numStudents<=0){
+    Swal.fire('ข้อมูลไม่ถูกต้อง','จำนวนข้อสอบและจำนวนนักเรียนต้องมากกว่า 0','warning');
+    return false;
+  }
+  return true;
+}
+
+function generateInputGrid(prefill=null){
+  if(!validateBaseForm()) return;
+
+  const d = getFormDataBase();
+  answerSet = d.answerSet.toUpperCase();
+  const table = $('input-grid');
+
+  const headers = Array.from({length:d.numQuestions},(_,i)=>`<th>ข้อ ${i+1}</th>`).join('');
+  const keyCells = Array.from({length:d.numQuestions},(_,q)=>
+    `<td><input class="answer-input" id="key-${q}" data-row="-1" data-col="${q}" maxlength="1"></td>`
+  ).join('');
+
+  const studentRows = Array.from({length:d.numStudents},(_,s)=>{
+    const cells = Array.from({length:d.numQuestions},(_,q)=>
+      `<td><input class="answer-input" id="s${s}-q${q}" data-row="${s}" data-col="${q}" maxlength="1"></td>`
+    ).join('');
+    return `<tr><td class="sticky-col">นักเรียน ${s+1}</td>${cells}</tr>`;
+  }).join('');
+
+  table.innerHTML = `
+    <thead><tr><th class="sticky-col">รายการ</th>${headers}</tr></thead>
+    <tbody>
+      <tr class="answer-key-row"><td class="sticky-col">เฉลย</td>${keyCells}</tr>
+      ${studentRows}
+    </tbody>`;
+
+  table.querySelectorAll('.answer-input').forEach(input=>{
+    input.addEventListener('input', sanitizeInput);
+    input.addEventListener('keydown', handleGridNavigation);
+    input.addEventListener('paste', handlePaste);
+  });
+
+  if(prefill) fillGrid(prefill);
+
+  $('form-panel').classList.add('hidden');
+  $('grid-panel').classList.remove('hidden');
+  $('results-section').innerHTML='';
+  setStep(2);
+  updateProgress();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function sanitizeValue(v){
+  const x = String(v||'').trim().toUpperCase();
+  return x && answerSet.includes(x[0]) ? x[0] : '';
+}
+
+function sanitizeInput(e){
+  e.target.value = sanitizeValue(e.target.value);
+  updateProgress();
+}
+
+function handleGridNavigation(e){
+  if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Tab'].includes(e.key)) return;
+  e.preventDefault();
+
+  let row = parseInt(e.target.dataset.row);
+  let col = parseInt(e.target.dataset.col);
+
+  if(e.key==='ArrowUp') row--;
+  if(e.key==='ArrowDown' || e.key==='Enter') row++;
+  if(e.key==='ArrowLeft' || (e.key==='Tab' && e.shiftKey)) col--;
+  if(e.key==='ArrowRight' || (e.key==='Tab' && !e.shiftKey)) col++;
+
+  focusCell(row,col);
+}
+
+function focusCell(row,col){
+  const d = getFormDataBase();
+  if(col<0){ col=d.numQuestions-1; row--; }
+  if(col>=d.numQuestions){ col=0; row++; }
+
+  if(row < -1) row=-1;
+  if(row >= d.numStudents) return;
+
+  const id = row===-1 ? `key-${col}` : `s${row}-q${col}`;
+  const el = $(id);
+  if(el){ el.focus(); el.select(); }
+}
+
+function handlePaste(e){
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  if(!text || (!text.includes('\t') && !text.includes('\n'))) return;
+
+  e.preventDefault();
+  const startRow = parseInt(e.target.dataset.row);
+  const startCol = parseInt(e.target.dataset.col);
+  const rows = text.replace(/\r/g,'').trimEnd().split('\n').map(r=>r.split('\t'));
+
+  rows.forEach((rowVals,rOffset)=>{
+    rowVals.forEach((val,cOffset)=>{
+      const r = startRow + rOffset;
+      const c = startCol + cOffset;
+      const id = r===-1 ? `key-${c}` : `s${r}-q${c}`;
+      const el = $(id);
+      if(el) el.value = sanitizeValue(val);
+    });
+  });
+
+  updateProgress();
+}
+
+function updateProgress(){
+  const d = getFormDataBase();
+  let keyFilled=0, cellsFilled=0, studentsWithAny=0;
+
+  for(let q=0;q<d.numQuestions;q++){
+    const el=$(`key-${q}`);
+    if(el && el.value){keyFilled++;cellsFilled++;}
+  }
+
+  for(let s=0;s<d.numStudents;s++){
+    let any=false;
+    for(let q=0;q<d.numQuestions;q++){
+      const el=$(`s${s}-q${q}`);
+      if(el && el.value){cellsFilled++;any=true;}
+    }
+    if(any) studentsWithAny++;
+  }
+
+  const total=d.numQuestions*(d.numStudents+1);
+  const pct=total?Math.round(cellsFilled/total*100):0;
+
+  $('progress-key').textContent=`${keyFilled}/${d.numQuestions}`;
+  $('progress-students').textContent=`${studentsWithAny}/${d.numStudents}`;
+  $('progress-cells').textContent=`${pct}%`;
+}
+
+function gatherCurrentInputData(){
+  const d=getFormDataBase();
+  const answerKey=[];
+  const studentAnswers=[];
+
+  for(let q=0;q<d.numQuestions;q++){
+    answerKey.push(($(`key-${q}`)?.value||'').trim().toUpperCase());
+  }
+
+  for(let s=0;s<d.numStudents;s++){
+    const row=[];
+    for(let q=0;q<d.numQuestions;q++){
+      row.push(($(`s${s}-q${q}`)?.value||'').trim().toUpperCase());
+    }
+    studentAnswers.push(row);
+  }
+
+  return {...d,answerKey,studentAnswers};
+}
+
+function backToForm(){
+  $('grid-panel').classList.add('hidden');
+  $('form-panel').classList.remove('hidden');
+  setStep(1);
+}
+
+function saveDraft(){
+  const data=gatherCurrentInputData();
+  showLoader(true);
+
+  google.script.run
+    .withSuccessHandler(res=>{
+      showLoader(false);
+      Swal.fire('บันทึกแบบร่างแล้ว',`บันทึกเมื่อ ${res.timestamp}`,'success');
+    })
+    .withFailureHandler(showError)
+    .saveDraft(data);
+}
+
+function loadDraftFromForm(){
+  if(!validateBaseForm()) return;
+
+  const q=getFormDataBase();
+  showLoader(true);
+
+  google.script.run
+    .withSuccessHandler(draft=>{
+      showLoader(false);
+      if(!draft){
+        Swal.fire('ไม่พบแบบร่าง','ไม่พบแบบร่างตรงกับรายการนี้','info');
+        return;
+      }
+
+      $('semester').value=draft.semester||q.semester;
+      $('academicYear').value=draft.academicYear||q.academicYear;
+      $('subjectName').value=draft.subjectName||q.subjectName;
+      $('subjectCode').value=draft.subjectCode||q.subjectCode;
+      $('gradeLevel').value=draft.gradeLevel||q.gradeLevel;
+      $('teacherName').value=draft.teacherName||q.teacherName;
+      $('answerSet').value=draft.answerSet||q.answerSet;
+      $('numQuestions').value=draft.numQuestions||q.numQuestions;
+      $('numStudents').value=draft.numStudents||q.numStudents;
+
+      generateInputGrid(draft);
+      Swal.fire('โหลดสำเร็จ','โหลดแบบร่างแล้ว สามารถทำต่อได้ทันที','success');
+    })
+    .withFailureHandler(showError)
+    .loadDraft(q);
+}
+
+function fillGrid(data){
+  (data.answerKey||[]).forEach((v,q)=>{
+    const el=$(`key-${q}`); if(el) el.value=sanitizeValue(v);
+  });
+
+  (data.studentAnswers||[]).forEach((row,s)=>{
+    (row||[]).forEach((v,q)=>{
+      const el=$(`s${s}-q${q}`); if(el) el.value=sanitizeValue(v);
+    });
+  });
+
+  updateProgress();
+}
+
+function importExcel(){
+  if(!$('answerSet').value){
+    Swal.fire('เลือกรูปแบบคำตอบก่อน','กรุณาเลือกรูปแบบคำตอบก่อนนำเข้า Excel','warning');
+    return;
+  }
+
+  const file=$('excel-upload').files[0];
+  if(!file){
+    Swal.fire('ไม่พบไฟล์','กรุณาเลือกไฟล์ Excel','warning');
+    return;
+  }
+
+  showLoader(true);
+  const reader=new FileReader();
+
+  reader.onload=e=>{
+    try{
+      const workbook=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const worksheet=workbook.Sheets[workbook.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(worksheet,{header:1,defval:''});
+      const answerData=rows.slice(1).map(r=>r.slice(1));
+
+      if(!answerData.length || !answerData[0].length) throw new Error('ไม่พบข้อมูลคำตอบในไฟล์');
+
+      $('numStudents').value=answerData.length;
+      $('numQuestions').value=Math.max(...answerData.map(r=>r.length));
+
+      const prefill={
+        answerKey:[],
+        studentAnswers:answerData
+      };
+
+      showLoader(false);
+      generateInputGrid(prefill);
+      Swal.fire('นำเข้าสำเร็จ','นำคำตอบนักเรียนเข้าในตารางแล้ว กรุณากรอกเฉลยก่อนวิเคราะห์','success');
+
+    }catch(err){ showError(err); }
+    finally{$('excel-upload').value='';}
+  };
+
+  reader.onerror=()=>showError(new Error('อ่านไฟล์ไม่สำเร็จ'));
+  reader.readAsArrayBuffer(file);
+}
+
+function runAnalysis(save){
+  const data=gatherCurrentInputData();
+
+  for(let i=0;i<data.answerKey.length;i++){
+    if(!data.answerKey[i]){
+      Swal.fire('เฉลยไม่ครบ',`กรุณากรอกเฉลยข้อที่ ${i+1}`,'warning');
+      return;
+    }
+  }
+
+  showLoader(true);
+  const runner=google.script.run
+    .withSuccessHandler(result=>{
+      showLoader(false);
+      renderResult(result,!save);
+      if(save){
+        Swal.fire({title:'บันทึกสำเร็จ',text:'วิเคราะห์และบันทึกผลเรียบร้อยแล้ว',icon:'success',timer:1800,showConfirmButton:false});
+      }
+    })
+    .withFailureHandler(showError);
+
+  if(save) runner.analyzeAndSave(data);
+  else runner.analyzeOnly(data);
+}
+
+function renderResult(result,isPreview=false,containerId='results-section'){
+  currentCharts.forEach(c=>{try{c.destroy()}catch(e){}});
+  currentCharts=[];
+
+  const q=result.qualitySummary||{};
+  const s=result.scoreSummary||{};
+  const raw=result.rawDataForSave||{};
+  const printableId='print-'+Math.random().toString(36).slice(2,9);
+
+  const choiceSet=[...new Set(result.analysis.flatMap(x=>[
+    ...Object.keys(x.choices||{}),
+    x.correctChoice
+  ]))].filter(Boolean).sort();
+
+  const choiceHeaders=choiceSet.map(c=>`<th>${escapeHtml(c)}</th>`).join('');
+
+  const rows=result.analysis.map(item=>{
+    const cls=item.interpretation==='ใช้ได้ดี'?'good':item.interpretation==='ควรปรับปรุง'?'improve':'bad';
+
+    const choiceCells=choiceSet.map(c=>{
+      const d=(item.choiceDetail||{})[c]||{count:0,percent:'0.0',high:0,low:0};
+      const label=(item.choiceAnalysis||{})[c]||'-';
+      const isCorrect=c===item.correctChoice;
+
+      const highText = (d.high === null || d.high === undefined) ? '-' : d.high;
+      const lowText = (d.low === null || d.low === undefined) ? '-' : d.low;
+      return `<td>
+        <div style="font-weight:${isCorrect?'700':'400'};color:${isCorrect?'#15803d':'inherit'}">
+          ${d.count} คน (${d.percent}%)
+        </div>
+        <div class="reason">สูง ${highText} / ต่ำ ${lowText}</div>
+        <div class="reason">${escapeHtml(label)}</div>
+      </td>`;
+    }).join('');
+
+    return `<tr class="${cls}">
+      <td><b>${item.item}</b></td>
+      <td><b>${escapeHtml(item.correctChoice)}</b></td>
+      ${choiceCells}
+      <td>${item.p}<div class="reason">${escapeHtml(item.difficultyLevel||'')}</div></td>
+      <td>${item.r}<div class="reason">${escapeHtml(item.discriminationLevel||'')}</div></td>
+      <td><b>${escapeHtml(item.interpretation)}</b><div class="reason">${escapeHtml(item.reason||'')}</div></td>
+    </tr>`;
+  }).join('');
+
+  const scoreList=(s.individualScores||[]).map((v,i)=>
+    `<div class="score-chip">คนที่ ${i+1}: <b>${v}/${s.fullScore}</b></div>`
+  ).join('');
+
+  const html=`
+  <div class="card panel print-target" id="${printableId}">
+    <div class="result-header">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <h2 style="margin:0 0 8px">${isPreview?'ผลวิเคราะห์เบื้องต้น':'ผลการวิเคราะห์ข้อสอบ'}</h2>
+          <div><b>วิชา:</b> ${escapeHtml(result.header.subjectName)} (${escapeHtml(result.header.subjectCode)})</div>
+          <div><b>ระดับชั้น:</b> ${escapeHtml(raw.gradeLevel)} | <b>ภาคเรียน:</b> ${escapeHtml(raw.semester)} | <b>ปีการศึกษา:</b> ${escapeHtml(raw.academicYear)}</div>
+          <div><b>ครูผู้สอน:</b> ${escapeHtml(result.header.teacherName)}</div>
+        </div>
+        ${isPreview?'<div class="no-print" style="color:#d97706;font-weight:700">ยังไม่ได้บันทึกผล</div>':''}
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="value">${result.kr20}</div>
+        <div class="label">KR-20 (${escapeHtml(q.kr20Level||'')})</div>
+      </div>
+      <div class="summary-card good">
+        <div class="value">${q.goodItems??0}</div>
+        <div class="label">ข้อใช้ได้ดี</div>
+      </div>
+      <div class="summary-card improve">
+        <div class="value">${q.improveItems??0}</div>
+        <div class="label">ควรปรับปรุง</div>
+      </div>
+      <div class="summary-card bad">
+        <div class="value">${q.badItems??0}</div>
+        <div class="label">ใช้งานไม่ได้</div>
+      </div>
+      <div class="summary-card">
+        <div class="value">${s.mean??'-'}</div>
+        <div class="label">คะแนนเฉลี่ย / ${s.fullScore??'-'}</div>
+      </div>
+    </div>
+
+    <div class="hint" style="margin-bottom:14px">
+      <b>ความเชื่อมั่น:</b> ${escapeHtml(q.kr20Text||'')} &nbsp; | &nbsp;
+      วิเคราะห์อำนาจจำแนกโดยใช้กลุ่มสูงและกลุ่มต่ำประมาณ ${q.groupPercentage??27}% กลุ่มละ ${q.groupSize??'-'} คน
+      ${q.legacyResult ? '<br><b>หมายเหตุ:</b> รายงานนี้เป็นข้อมูลเดิม ระบบเติมคำอธิบายและสรุปผลให้ใหม่จากค่าที่บันทึกไว้ โดยไม่แก้ไขข้อมูลต้นฉบับ' : ''}
+    </div>
+
+    <div class="result-table-wrap">
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>ข้อ</th>
+            <th>เฉลย</th>
+            ${choiceHeaders}
+            <th>P</th>
+            <th>R</th>
+            <th>สรุป</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <table class="result-table score-stat-table" style="min-width:0">
+          <thead><tr><th colspan="2">สถิติคะแนน</th></tr></thead>
+          <tbody>
+            <tr><td>คะแนนเต็ม</td><td>${s.fullScore??'-'}</td></tr>
+            <tr><td>ค่าเฉลี่ย</td><td>${s.mean??'-'}</td></tr>
+            <tr><td>S.D.</td><td>${s.sd??'-'}</td></tr>
+            <tr><td>สูงสุด</td><td>${s.maxScore??'-'}</td></tr>
+            <tr><td>ต่ำสุด</td><td>${s.minScore??'-'}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <canvas id="chart-${printableId}" height="160"></canvas>
+      </div>
+    </div>
+
+    <details style="margin-top:16px">
+      <summary style="cursor:pointer;font-weight:700">ดูคะแนนรายบุคคล</summary>
+      <div class="score-list">${scoreList}</div>
+    </details>
+
+    <div class="actions no-print">
+      <button class="btn btn-dark" onclick="printElement('${printableId}')">พิมพ์ผล</button>
+      <button class="btn btn-outline" onclick="backToGrid()">กลับไปแก้คำตอบ</button>
+    </div>
+  </div>`;
+
+  $(containerId).innerHTML=html;
+  $('grid-panel').classList.add('hidden');
+  $('form-panel').classList.add('hidden');
+  setStep(3);
+
+  setTimeout(()=>renderScoreChart(s.distribution||[],`chart-${printableId}`),50);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function backToGrid(){
+  $('results-section').innerHTML='';
+  $('grid-panel').classList.remove('hidden');
+  setStep(2);
+}
+
+function renderScoreChart(distribution,canvasId){
+  const canvas=$(canvasId);
+  if(!canvas) return;
+
+  const maxScore=Math.max(0,...distribution.map(x=>Number(x.score)));
+  const labels=Array.from({length:maxScore+1},(_,i)=>i);
+  const values=labels.map(score=>{
+    const d=distribution.find(x=>Number(x.score)===score);
+    return d?Number(d.count):0;
+  });
+
+  const chart=new Chart(canvas.getContext('2d'),{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'จำนวนนักเรียน',
+        data:values,
+        backgroundColor:'rgba(37,99,235,.55)',
+        borderColor:'rgba(37,99,235,1)',
+        borderWidth:1,
+        borderRadius:5
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{display:false},
+        title:{display:true,text:'การแจกแจงคะแนนสอบ',font:{family:'Sarabun',size:16}}
+      },
+      scales:{
+        y:{beginAtZero:true,ticks:{stepSize:1}},
+        x:{title:{display:true,text:'คะแนน'}}
+      }
+    }
+  });
+
+  currentCharts.push(chart);
+}
+
+function printElement(id){
+  const el=$(id);
+  if(!el) return;
+
+  document.querySelectorAll('.print-target').forEach(x=>x.classList.remove('print-target'));
+  el.classList.add('print-target');
+  window.print();
+}
+
+function loadTeacherReports(){
+  const teacher=$('searchTeacherName').value;
+  const tbody=$('teacher-report-tbody');
+  const summary=$('teacher-report-summary');
+
+  summary.classList.add('hidden');
+
+  if(!teacher){
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">กรุณาเลือกครูผู้สอน</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">กำลังโหลดรายงาน...</td></tr>';
+
+  google.script.run
+    .withSuccessHandler(list=>{
+      window.__teacherReports=list || [];
+
+      if(!list.length){
+        tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">ไม่พบผลวิเคราะห์ของครูท่านนี้</td></tr>';
+        return;
+      }
+
+      const oldCount=list.filter(x=>x.isLegacy).length;
+      summary.innerHTML=`พบ <b>${list.length}</b> รายงาน${oldCount ? ` โดยเป็นข้อมูลเดิม <b>${oldCount}</b> รายงาน` : ''}`;
+      summary.classList.remove('hidden');
+
+      tbody.innerHTML=list.map((r,i)=>`
+        <tr>
+          <td>${escapeHtml(r.timestamp)}</td>
+          <td>
+            <b>${escapeHtml(r.subjectCode)}</b> ${escapeHtml(r.subjectName)}
+            ${r.isLegacy ? '<span class="badge-old">ข้อมูลเดิม</span>' : ''}
+          </td>
+          <td>${escapeHtml(r.gradeLevel)}</td>
+          <td>ภาค ${escapeHtml(r.semester)} / ${escapeHtml(r.academicYear)}</td>
+          <td>${r.numQuestions} ข้อ / ${r.numStudents} คน</td>
+          <td><b>${escapeHtml(r.kr20)}</b></td>
+          <td style="text-align:center">
+            <button class="btn btn-primary" style="padding:7px 12px" onclick="openTeacherReport(${i})">ดูรายงาน</button>
+          </td>
+        </tr>`).join('');
+    })
+    .withFailureHandler(showError)
+    .getTeacherReportList(teacher);
+}
+
+function openTeacherReport(index){
+  const meta=(window.__teacherReports||[])[index];
+  if(!meta) return;
+
+  showLoader(true);
+  google.script.run
+    .withSuccessHandler(result=>{
+      showLoader(false);
+      showView('analysis-view');
+      renderResult(result,false,'results-section');
+    })
+    .withFailureHandler(showError)
+    .getResultByAnalysisId(meta.analysisId);
+}
+
+function renderPastResults(results){
+  if(!results.length){
+    $('past-results-display').innerHTML='<div class="card panel">ไม่พบผลการวิเคราะห์</div>';
+    return;
+  }
+
+  $('past-results-display').innerHTML=results.map((r,i)=>{
+    const raw=r.rawDataForSave||{};
+    return `
+      <div class="past-card card" id="past-card-${i}">
+        <div class="past-card-head">
+          <div>
+            <b>${escapeHtml(r.header.subjectName)} (${escapeHtml(r.header.subjectCode)})</b><br>
+            <span style="font-size:12px;color:var(--muted)">
+              ${escapeHtml(raw.gradeLevel)} | ${escapeHtml(r.timestamp||'')} | KR-20 ${escapeHtml(r.kr20)}
+            </span>
+          </div>
+          <button class="btn btn-outline" onclick="togglePastResult(${i})">ดูรายละเอียด</button>
+        </div>
+        <div class="past-card-body" id="past-body-${i}"></div>
+      </div>`;
+  }).join('');
+
+  window.__pastResults=results;
+}
+
+function togglePastResult(i){
+  const card=$(`past-card-${i}`);
+  const body=$(`past-body-${i}`);
+  const opening=!card.classList.contains('open');
+  card.classList.toggle('open',opening);
+
+  if(opening && !body.dataset.loaded){
+    const r=window.__pastResults[i];
+    const tempId='past-render-'+i;
+    body.innerHTML=`<div id="${tempId}"></div>`;
+
+    // render แบบย่อใน body
+    renderPastResultBody(r,tempId,i);
+    body.dataset.loaded='1';
+  }
+}
+
+function renderPastResultBody(r,tempId,i){
+  const q=r.qualitySummary||{};
+  const s=r.scoreSummary||{};
+
+  const rows=(r.analysis||[]).map(item=>`
+    <tr>
+      <td>${item.item}</td>
+      <td>${escapeHtml(item.correctChoice)}</td>
+      <td>${item.p}</td>
+      <td>${item.r}</td>
+      <td>${escapeHtml(item.interpretation)}</td>
+      <td>${escapeHtml(item.reason||'')}</td>
+    </tr>`).join('');
+
+  $(tempId).innerHTML=`
+    <div class="summary-grid">
+      <div class="summary-card"><div class="value">${r.kr20}</div><div class="label">KR-20</div></div>
+      <div class="summary-card good"><div class="value">${q.goodItems??'-'}</div><div class="label">ใช้ได้ดี</div></div>
+      <div class="summary-card improve"><div class="value">${q.improveItems??'-'}</div><div class="label">ควรปรับ</div></div>
+      <div class="summary-card bad"><div class="value">${q.badItems??'-'}</div><div class="label">ใช้ไม่ได้</div></div>
+      <div class="summary-card"><div class="value">${s.mean??'-'}</div><div class="label">เฉลี่ย</div></div>
+    </div>
+
+    <div class="result-table-wrap">
+      <table class="result-table" style="min-width:700px">
+        <thead><tr><th>ข้อ</th><th>เฉลย</th><th>P</th><th>R</th><th>สรุป</th><th>เหตุผล</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-dark" onclick="openFullPastResult(${i})">เปิดรายงานฉบับเต็ม</button>
+    </div>`;
+}
+
+function openFullPastResult(i){
+  const r=window.__pastResults[i];
+  showView('analysis-view');
+  renderResult(r,false,'results-section');
+}
+
+</script>
+</body>
+</html>
