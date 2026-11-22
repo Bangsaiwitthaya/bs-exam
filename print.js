@@ -22,13 +22,13 @@ const OMRPrint=(()=>{
   const name=s.name||'..............................................';
   const blank=!s.studentId;
   const parts=[
-   txt(20,23,'โรงเรียนบางไทรวิทยา',5.4,'font-weight="700"'),
-   txt(20,30,'กระดาษคำตอบ'+subtitle+' · '+e.examType,3.9,'font-weight="700"'),
-   txt(20,36,`${e.subjectName} (${e.subjectCode}) · ${e.semester}/${e.academicYear}`,3.0),
-   txt(20,43,`ชื่อ–สกุล ${name}`,3.5),
-   txt(20,49,`ชั้น ${s.room||'......................'}`,3.4),
-   txt(20,55,`เลขประจำตัว ${s.studentId||'................'}`,3.45,'font-weight="600"'),
-   line(123,20,123,92,'.35','#999'),
+   txt(20,21,'โรงเรียนบางไทรวิทยา',4.9,'font-weight="700"'),
+   txt(20,27,'กระดาษคำตอบ'+subtitle+' · '+e.examType,3.6,'font-weight="700"'),
+   txt(20,33,`${e.subjectName} (${e.subjectCode}) · ${e.semester}/${e.academicYear}`,3.0),
+   txt(20,39,`ชื่อ–สกุล ${name}`,3.25),
+   txt(20,45,`ชั้น ${s.room||'......................'}`,3.2),
+   txt(20,51,`เลขประจำตัว ${s.studentId||'................'}`,3.2,'font-weight="600"'),
+   line(123,18,123,90,'.35','#999'),
    txt(130,29,'รหัสนักเรียน 5 หลัก',3.8,'font-weight="700"'),
    txt(130,34,blank?'ฝนตัวเลขให้ครบทุกหลัก':'',2.7),
   ];
@@ -39,8 +39,8 @@ const OMRPrint=(()=>{
   const layout=OMRLayout.forCount(count),idLayout=OMRLayout.student,parts=[];
   for(const [x,y] of [[10,10],[192,10],[10,279],[192,279]])parts.push(rect(x,y,8,8));
   parts.push(header(e,s,'ปรนัย'));
-  parts.push(`<image x="20" y="59" width="29" height="29" href="${qr(`BSOMR2|${e.examId}|${s.studentId||''}|1`)}"/>`);
-  parts.push(txt(52,66,'QR ชุดข้อสอบและนักเรียน',3.0),txt(52,73,'สแกนพร้อมช่องคำตอบ',2.8),txt(52,80,'ไม่ต้องสแกน QR แยก',2.7));
+  parts.push(`<image x="20" y="55" width="25" height="25" href="${qr(`BSOMR2|${e.examId}|${s.studentId||''}|1`)}"/>`);
+  parts.push(txt(49,66,'QR ประจำกระดาษคำตอบ',2.9));
   
   const id=String(s.studentId||'').trim(),digits=/^\d{1,5}$/.test(id)?id.padStart(5,'0').split('').map(Number):null;
   for(let d=0;d<5;d++){
@@ -50,11 +50,11 @@ const OMRPrint=(()=>{
     for(let r=0;r<10;r++)parts.push(circ(x,idLayout.y0+r*idLayout.dy,idLayout.r,!!digits&&digits[d]===r));
   }
   for(let r=0;r<10;r++)parts.push(txt(129,48+r*idLayout.dy,r,2.9));
-  parts.push(txt(20,95,'ระบายคำตอบให้เต็มวงด้วยดินสอ หรือปากกาสีน้ำเงิน/ดำ',3.2),line(20,98,191,98,'.4','#333'));
+  parts.push(txt(20,89.5,'ระบายคำตอบให้เต็มวงด้วยดินสอ หรือปากกาสีน้ำเงิน/ดำ',3.0),line(20,92,191,92,'.4','#333'));
   for(let col=0;col<layout.columns;col++){
     const base=layout.baseXs[col];
-    parts.push(txt(base-12.0,102,'ข้อ',3.0,'font-weight="700"'));
-    opts.forEach((ch,j)=>parts.push(txt(base+j*layout.choicePitch,102,ch,3.15,'text-anchor="middle" font-weight="700"')));
+    parts.push(txt(base-12.0,96,'ข้อ',3.0,'font-weight="700"'));
+    opts.forEach((ch,j)=>parts.push(txt(base+j*layout.choicePitch,96,ch,3.15,'text-anchor="middle" font-weight="700"')));
   }
   for(let q=0;q<count;q++){
     const pos=layout.position(q,0);
@@ -76,7 +76,7 @@ const OMRPrint=(()=>{
  function inlineEssay(e){
   if(e.essayMode!=='same'||!e.essayQuestions?.length)return {html:'',skip:0};
   const layout=OMRLayout.forCount(Number(e.numQuestions));
-  const top=Math.max(111+layout.pitch*(layout.rows-1)+12,114);
+  const top=Math.max(105+layout.pitch*(layout.rows-1)+12,108);
   const available=264-top;
   if(available<23)return {html:'',skip:0};
   let html='',used=0,skip=0;

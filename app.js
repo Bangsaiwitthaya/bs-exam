@@ -1,6 +1,6 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const S={teacher:'',exam:null,students:[],stream:null,processing:false,lastPaper:'',lastDone:0};
+const S={teacher:'',exam:null,students:[],stream:null,processing:false,lastPaper:'',lastDone:0,editExamId:null};
 function message(s,error=false){$('message').textContent=s;$('message').classList.toggle('error',error)}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function api(action,data={}){
@@ -10,9 +10,14 @@ async function api(action,data={}){
 }
 async function attempt(fn){try{await fn()}catch(e){console.error(e);message(e.message||String(e),true);await ExamUI.alert('ดำเนินการไม่สำเร็จ',e.message||String(e),'error')}}
 async function startForTeacher(){
-  S.teacher=$('teacher').value.trim();if(!S.teacher)throw Error('กรุณาเลือกชื่อครู');
-  await api('login');$('loginPanel').classList.add('hidden');$('workspace').classList.remove('hidden');
-  $('welcome').textContent='ครู '+S.teacher;message('เลือกครูเรียบร้อย');ExamUI.toast('เข้าสู่ระบบในชื่อ '+S.teacher);await listExams();ExamRoute.afterLogin();
+ const selected=$('teacher').value.trim();if(!selected)throw Error('กรุณาเลือกชื่อครู');
+ ExamUI.busy('กำลังเปิดข้อมูลของครู...');
+ try {
+  S.teacher=selected;await api('login');await listExams();
+ } catch(e){S.teacher='';throw e;} finally{ExamUI.close();}
+ $('loginPanel').classList.add('hidden');$('workspace').classList.remove('hidden');
+ $('welcome').textContent='ครู '+S.teacher;message('เลือกครูเรียบร้อย');ExamRoute.afterLogin();
+ await ExamUI.alert('เข้าสู่ระบบสำเร็จ','คุณกำลังใช้งานในชื่อ '+S.teacher,'success');
 }
 $('login').onclick=()=>attempt(startForTeacher);
 $('logout').onclick=()=>{stopCamera();S.teacher='';S.exam=null;$('workspace').classList.add('hidden');$('loginPanel').classList.remove('hidden');ExamRoute.navigate('create');message('กลับหน้าเลือกครู');ExamUI.toast('กลับหน้าเลือกครูแล้ว','info')};
@@ -31,25 +36,77 @@ function renderEssayQuestionInputs(){
 $('essay').addEventListener('change',renderEssayQuestionInputs);
 $('essayCount').addEventListener('input',renderEssayQuestionInputs);
 renderEssayQuestionInputs();
-$('create').onclick=()=>attempt(async()=>{
-  const rooms=[...$('rooms').querySelectorAll('input:checked')].map(x=>x.value);
-  if(!rooms.length)throw Error('กรุณาเลือกอย่างน้อย 1 ห้องเรียน');
-  if(!await ExamUI.confirm('ยืนยันสร้างชุดข้อสอบ',`สร้างชุดข้อสอบ ${$('subject').value||''} จำนวน ${$('nq').value} ข้อ สำหรับ ${rooms.length} ห้องเรียน?`,'สร้างชุดข้อสอบ'))return;
-  ExamUI.busy('กำลังสร้างชุดข้อสอบ...');
-  const essayPhotos=[...document.querySelectorAll('.essay-upload')].map(x=>x.files[0]||null);
-  let result; try{result=await api('createExam',{academicYear:$('year').value,semester:$('semester').value,examType:$('examType').value,subjectCode:$('code').value.trim(),subjectName:$('subject').value.trim(),rooms,numQuestions:Number($('nq').value),choiceSet:$('choices').value,essayMode:$('essay').value,essayCount:Number($('essayCount').value),essayLines:Number($('essayLines').value),essayQuestions:[...document.querySelectorAll('.essay-question')].map(x=>x.value.trim())});}finally{ExamUI.close()}
-  // Save image files separately to Drive, never embed large base64 into spreadsheet cells.
-  for(let i=0;i<essayPhotos.length;i++)if(essayPhotos[i]){
-   ExamUI.busy('กำลังบันทึกภาพประกอบข้อ '+(i+1));
-   try{const data=await compressEssayPhoto(essayPhotos[i]);await api('uploadEssayImage',{examId:result.examId,index:i,base64:data});}finally{ExamUI.close()}
-  }
-  message('สร้างชุดข้อสอบสำเร็จ');ExamUI.toast('สร้างชุดข้อสอบสำเร็จ');await listExams();await openExam(result.examId);ExamRoute.navigate('print');
-});
-async function listExams(){
- const data=await api('listExams');$('examList').innerHTML='<table><tr><th>ประเภท/วิชา</th><th>ปี/ภาค</th><th>ห้อง</th><th>เฉลย</th><th></th></tr>'+data.map(e=>`<tr><td>${esc(e.examType)}<br>${esc(e.subjectName)} (${esc(e.subjectCode)})</td><td>${esc(e.academicYear)}/${esc(e.semester)}</td><td>${esc(e.rooms.join(', '))}</td><td>${e.hasKey?'ครบ':'รอเฉลย'}</td><td><button data-exam="${esc(e.examId)}">เปิด</button></td></tr>`).join('')+'</table>';
- $('examList').querySelectorAll('[data-exam]').forEach(b=>b.onclick=()=>attempt(()=>openExam(b.dataset.exam)));
+function readExamForm(){
+ return {academicYear:$('year').value,semester:$('semester').value,examType:$('examType').value,
+  subjectCode:$('code').value.trim(),subjectName:$('subject').value.trim(),
+  rooms:[...$('rooms').querySelectorAll('input:checked')].map(x=>x.value),numQuestions:Number($('nq').value),
+  choiceSet:$('choices').value,essayMode:$('essay').value,
+  essayCount:$('essay').value==='none'?0:Number($('essayCount').value),essayLines:Number($('essayLines').value),
+  essayQuestions:$('essay').value==='none'?[]:[...document.querySelectorAll('.essay-question')].map(x=>x.value.trim())};
 }
-$('reload').onclick=()=>attempt(listExams);
+function cancelEdit(){S.editExamId=null;$('createTitle').textContent='สร้างกระดาษคำตอบ';$('create').textContent='บันทึกชุดข้อสอบ';$('cancelEdit').classList.add('hidden');}
+$('cancelEdit').onclick=cancelEdit;
+$('create').onclick=()=>attempt(async()=>{
+ const form=readExamForm(),editing=!!S.editExamId;
+ if(!form.rooms.length)throw Error('กรุณาเลือกอย่างน้อย 1 ห้องเรียน');
+ if(!await ExamUI.confirm(editing?'ยืนยันแก้ไขชุดข้อสอบ':'ยืนยันสร้างชุดข้อสอบ',
+  `${form.subjectName} จำนวน ${form.numQuestions} ข้อ สำหรับ ${form.rooms.length} ห้องเรียน${editing?'\n(หากเปลี่ยนจำนวนข้อหรือรูปแบบตัวเลือก เฉลยเดิมจะถูกล้าง)':''}`,
+  editing?'บันทึกการแก้ไข':'สร้างชุดข้อสอบ'))return;
+ const photos=[...document.querySelectorAll('.essay-upload')].map(x=>x.files[0]||null);
+ ExamUI.busy(editing?'กำลังแก้ไขชุดข้อสอบ...':'กำลังสร้างชุดข้อสอบ...');
+ let result;
+ try{result=await api(editing?'updateExam':'createExam',{...form,...(editing?{examId:S.editExamId}:{})});}
+ finally{ExamUI.close()}
+ for(let i=0;i<photos.length;i++)if(photos[i]){
+  ExamUI.busy('กำลังบันทึกภาพประกอบข้อ '+(i+1));
+  try{const data=await compressEssayPhoto(photos[i]);await api('uploadEssayImage',{examId:result.examId,index:i,base64:data});}finally{ExamUI.close()}
+ }
+ cancelEdit();message(editing?'แก้ไขชุดข้อสอบสำเร็จ':'สร้างชุดข้อสอบสำเร็จ');
+ await ExamUI.alert('บันทึกสำเร็จ',editing?'แก้ไขข้อมูลชุดข้อสอบเรียบร้อยแล้ว':'สร้างชุดข้อสอบเรียบร้อยแล้ว','success');
+ await listExams();await openExam(result.examId);ExamRoute.navigate('print');
+});
+async function editExam(id){
+ const e=await api('getExam',{examId:id});
+ if(e.scanned||e.lastAnalysisId)throw Error('ชุดข้อสอบมีผลตรวจหรือรายงานย้อนหลังแล้ว ไม่สามารถแก้ไขได้');
+ S.editExamId=id;
+ $('year').value=e.academicYear;$('semester').value=e.semester;$('examType').value=e.examType;
+ $('code').value=e.subjectCode;$('subject').value=e.subjectName;$('nq').value=e.numQuestions;
+ $('choices').value=e.choiceSet;$('essay').value=e.essayMode;$('essayCount').value=e.essayCount;
+ $('essayLines').value=e.essayLines;renderEssayQuestionInputs();
+ [...document.querySelectorAll('.essay-question')].forEach((x,i)=>x.value=e.essayQuestions[i]||'');
+ const roomList=await api('listRooms',{academicYear:e.academicYear});
+ $('rooms').innerHTML=roomList.map(r=>`<label class="checkroom"><input type="checkbox" value="${esc(r)}" ${e.rooms.includes(r)?'checked':''}> ${esc(r)}</label>`).join('');
+ $('createTitle').textContent='แก้ไขชุดกระดาษคำตอบ';$('create').textContent='บันทึกการแก้ไข';$('cancelEdit').classList.remove('hidden');
+ ExamRoute.navigate('create');
+ await ExamUI.alert('เปิดชุดข้อสอบสำหรับแก้ไข','แก้ไขข้อมูลแล้วกดบันทึกได้ ภาพอัตนัยเดิมจะคงอยู่ถ้าไม่ได้อัปโหลดภาพใหม่','info');
+}
+async function deleteExam(id){
+ const e=await api('getExam',{examId:id});
+ if(e.scanned||e.lastAnalysisId)throw Error('ชุดนี้มีผลตรวจหรือรายงานย้อนหลังแล้ว ไม่สามารถลบได้');
+ if(!await ExamUI.confirm('ยืนยันลบชุดกระดาษคำตอบ',
+  `ต้องการลบ ${e.subjectName} (${e.subjectCode}) ${e.examType} ใช่หรือไม่?\nระบบจะซ่อนชุดข้อสอบออกจากรายการ และกระดาษที่พิมพ์ไว้จะใช้กับระบบนี้ไม่ได้`,
+  'ลบชุดข้อสอบ'))return;
+ ExamUI.busy('กำลังลบชุดข้อสอบ...');
+ try{await api('deleteExam',{examId:id,confirm:true});}finally{ExamUI.close()}
+ if(S.exam?.examId===id){stopCamera();S.exam=null;S.students=[];$('currentPanel').classList.add('hidden');}
+ if(S.editExamId===id)cancelEdit();
+ await listExams();await ExamUI.alert('ลบสำเร็จ','ซ่อนชุดกระดาษคำตอบออกจากรายการแล้ว','success');
+}
+async function listExams(){
+ const data=await api('listExams');
+ $('examList').innerHTML='<table><tr><th>ประเภท/วิชา</th><th>ปี/ภาค</th><th>ห้อง</th><th>เฉลย</th><th>จัดการ</th></tr>'+
+ data.map(e=>`<tr><td>${esc(e.examType)}<br>${esc(e.subjectName)} (${esc(e.subjectCode)})</td><td>${esc(e.academicYear)}/${esc(e.semester)}</td><td>${esc(e.rooms.join(', '))}</td><td>${e.hasKey?'ครบ':'รอเฉลย'}</td><td><div class="exam-actions"><button data-exam="${esc(e.examId)}">เปิด</button><button class="secondary" data-edit="${esc(e.examId)}">แก้ไข</button><button class="danger-action" data-delete="${esc(e.examId)}">ลบ</button></div></td></tr>`).join('')+'</table>';
+ $('examList').querySelectorAll('[data-exam]').forEach(b=>b.onclick=()=>attempt(()=>openExam(b.dataset.exam)));
+ $('examList').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>attempt(()=>editExam(b.dataset.edit)));
+ $('examList').querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>attempt(()=>deleteExam(b.dataset.delete)));
+ if($('createExamList')){
+  $('createExamList').innerHTML=data.length?'<table><tr><th>วิชา</th><th>ปี/ภาค</th><th>จัดการ</th></tr>'+data.map(e=>
+   `<tr><td>${esc(e.subjectName)} (${esc(e.subjectCode)})</td><td>${esc(e.academicYear)}/${esc(e.semester)}</td><td><div class="exam-actions"><button class="secondary" data-create-edit="${esc(e.examId)}">แก้ไข</button><button class="danger-action" data-create-delete="${esc(e.examId)}">ลบ</button></div></td></tr>`).join('')+'</table>':'<p class="sub">ยังไม่มีชุดข้อสอบ</p>';
+  $('createExamList').querySelectorAll('[data-create-edit]').forEach(b=>b.onclick=()=>attempt(()=>editExam(b.dataset.createEdit)));
+  $('createExamList').querySelectorAll('[data-create-delete]').forEach(b=>b.onclick=()=>attempt(()=>deleteExam(b.dataset.createDelete)));
+ }
+}
+$('reload').onclick=()=>attempt(listExams);$('reloadCreate').onclick=()=>attempt(listExams);
 async function openExam(id){
  stopCamera();S.exam=await api('getExam',{examId:id});S.students=await api('getStudents',{examId:id});
  const e=S.exam;$('currentPanel').classList.remove('hidden');$('examTitle').textContent=`${e.examType} • ${e.subjectName}`;

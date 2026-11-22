@@ -14,3 +14,6 @@
 .essay-upload{font-size:12px}.essay-preview{max-width:100px;max-height:85px;object-fit:contain;display:block;margin:5px 0}
 #scanner{position:relative;max-width:700px;margin:auto}#video{width:100%;max-width:unset;max-height:78svh;aspect-ratio:auto;object-fit:contain}#scanner .row{margin:12px 0}#report{margin:15px 0}
 @media(max-width:650px){.site-nav{display:grid;grid-template-columns:1fr 1fr}.site-nav a{grid-column:1/-1}.feature-grid{grid-template-columns:1fr}.head-inner{padding:12px}.head-brand h1{font-size:18px}.card{margin-bottom:11px}.pdf-import{margin-top:16px}#scanTools #keyInputs{max-height:50vh;overflow:auto}}
+
+/* V4.1: Manage saved paper sets */
+.exam-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.exam-actions button{padding:7px 10px;font-size:12px}.danger-action{background:#b91c1c;color:white}#cancelEdit{border:1px solid #cbd5e1}@media(max-width:600px){.exam-actions{flex-direction:column;align-items:stretch}}

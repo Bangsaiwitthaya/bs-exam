@@ -12,9 +12,9 @@ window.OMRLayout=Object.freeze({
   const radius=2.35;
   const baseXs=columns===4?[27,73,119,165]:columns===3?[31,91,151]:[53,133];
   const choicePitch=columns===4?6.15:columns===3?7.5:8.7;
-  return {columns,rows,pitch,radius,baseXs,choicePitch,y0:105,
+  return {columns,rows,pitch,radius,baseXs,choicePitch,y0:99,
    position(index,choice){const col=Math.floor(index/rows),row=index%rows;
-    return {x:baseXs[col]+choice*choicePitch,y:105+row*pitch,col,row};}
+    return {x:baseXs[col]+choice*choicePitch,y:99+row*pitch,col,row};}
   };
  }
 });
