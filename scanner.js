@@ -76,31 +76,42 @@ async function scanFrame(){
  S.processing=true;
  try{
   const video=$('video');if(video.readyState<2)return;
-  const cvs=$('capture');const max=1500,scale=Math.min(1,max/video.videoWidth);cvs.width=Math.round(video.videoWidth*scale);cvs.height=Math.round(video.videoHeight*scale);
+  const cvs=$('capture');const max=1800,scale=Math.min(1,max/video.videoWidth);cvs.width=Math.round(video.videoWidth*scale);cvs.height=Math.round(video.videoHeight*scale);
   cvs.getContext('2d',{willReadFrequently:true}).drawImage(video,0,0,cvs.width,cvs.height);
   const read=omrReadFrame(cvs,S.exam);
   if(!read){omrMissing++;if(omrMissing>=2){S.lastPaper='';omrCandidate='';omrRepeat=0;}return;}
   omrMissing=0;
-  if(read.qrExam && read.qrExam!==S.exam.examId)throw Error('กระดาษเป็นคนละชุดข้อสอบ');
-  const matched=read.studentDigits?S.students.filter(s=>s.studentId.padStart(5,'0')===read.studentDigits):[];
-  const studentId=read.qrStudent|| (matched.length===1?matched[0].studentId:'') || $('manualStudent').value;
-  const pageNo=1;
-  if(read.qrStudent && matched.length===1 && matched[0].studentId!==read.qrStudent)throw Error('รหัสวงดำไม่ตรงกับ QR กรุณาตรวจสอบกระดาษ');
-  if(!studentId)throw Error('ไม่ทราบรหัสนักเรียน โปรดตรวจ QR / วงดำ หรือเลือกนักเรียนด้วยตนเอง');
-  if(read.uncertain.length){message('อ่านไม่ชัดหรือฝนหลายตัวเลือก ข้อ '+read.uncertain.join(', ')+' กรุณาปรับแสงหรือแก้กระดาษ',true);return;}
-  const signature=studentId+'|'+pageNo+'|'+read.answers.join(',');
-  if(omrCandidate===signature)omrRepeat++;else{omrCandidate=signature;omrRepeat=1}
-  if(omrRepeat<2){message('อ่านได้แล้ว กำลังยืนยันภาพครั้งที่ 2');return;}
-  if(S.lastPaper===studentId+'|'+pageNo)return;
-  S.lastPaper=studentId+'|'+pageNo; // ห้ามตรวจแผ่นเดิมต่อเนื่องโดยไม่ยกออก
-  const result=await api('scan',{examId:S.exam.examId,studentId,pageNo,answers:read.answers});
-  if(result.duplicate){
-    $('scanResult').innerHTML=`<div class="card"><h3>พบการตรวจซ้ำ</h3><p>${esc(result.student.name)} ${esc(result.student.room)} แผ่น ${pageNo}/${result.totalPages} คะแนนเดิมเฉพาะแผ่น ${esc(result.previous.score)} คะแนน</p><button id="replaceScan" class="warn">ตรวจซ้ำและแทนที่คะแนนเดิม</button> <button id="cancelScan" class="secondary">ยกเลิก</button></div>`;
-    $('replaceScan').onclick=()=>attempt(async()=>{if(!await ExamUI.confirm('ยืนยันการตรวจซ้ำ',`แทนคะแนนเดิมของ ${result.student.name} (${result.previous.score} คะแนน) ด้วยผลสแกนใหม่?`,'ตรวจซ้ำและแทนที่'))return;const r=await api('scan',{examId:S.exam.examId,studentId,pageNo,answers:read.answers,replace:true,expectedRevision:result.previous.revision});showSaved(r)});
-    $('cancelScan').onclick=()=>{$('scanResult').innerHTML='';message('ข้ามกระดาษที่ตรวจแล้ว')};
-    message('พบการตรวจซ้ำ: ต้องยืนยันก่อนบันทึก');ExamUI.toast('พบกระดาษที่ตรวจแล้ว','warning');
-  }else showSaved(result);
+  await handleOMRRead(read,false);
  }finally{S.processing=false}
+}
+/** Shared between phone camera and scanned-PDF input. Never silently replaces scores. */
+async function handleOMRRead(read,fromPdf=false){
+ if(read.qrExam && read.qrExam!==S.exam.examId)throw Error('กระดาษเป็นคนละชุดข้อสอบ');
+ const matched=read.studentDigits?S.students.filter(s=>String(s.studentId).padStart(5,'0')===read.studentDigits):[];
+ const studentId=read.qrStudent|| (matched.length===1?matched[0].studentId:'') || (fromPdf?'':$('manualStudent').value);
+ if(read.qrStudent && matched.length===1 && matched[0].studentId!==read.qrStudent)throw Error('รหัสวงดำไม่ตรงกับ QR');
+ if(!studentId)throw Error('อ่านรหัสนักเรียนไม่ได้');
+ if(read.uncertain.length)throw Error('คำตอบไม่ชัด/ฝนหลายตัวเลือก ข้อ '+read.uncertain.join(', '));
+ const signature=studentId+'|1|'+read.answers.join(',');
+ if(!fromPdf){
+  if(omrCandidate===signature)omrRepeat++;else{omrCandidate=signature;omrRepeat=1;}
+  if(omrRepeat<2){message('กำลังยืนยันผลภาพอีกครั้ง');return {status:'unstable'}};
+  if(S.lastPaper===studentId+'|1')return {status:'same-paper'};
+  S.lastPaper=studentId+'|1';
+ }
+ const result=await api('scan',{examId:S.exam.examId,studentId,pageNo:1,answers:read.answers});
+ if(result.duplicate){
+  if(fromPdf)return {status:'duplicate',studentId};
+  $('scanResult').innerHTML=`<div class="card"><h3>พบการตรวจซ้ำ</h3><p>${esc(result.student.name)} • ${esc(result.student.room)} • คะแนนเดิม ${esc(result.previous.score)} คะแนน</p><button id="replaceScan" class="warn">ยืนยันตรวจซ้ำและแทนคะแนน</button> <button id="cancelScan" class="secondary">ไม่ตรวจซ้ำ</button></div>`;
+  $('replaceScan').onclick=()=>attempt(async()=>{
+   if(!await ExamUI.confirm('ยืนยันตรวจซ้ำ',`แทนคะแนนเดิมของ ${result.student.name}?`,'แทนคะแนนเดิม'))return;
+   const replacement=await api('scan',{examId:S.exam.examId,studentId,pageNo:1,answers:read.answers,replace:true,expectedRevision:result.previous.revision});showSaved(replacement);
+  });
+  $('cancelScan').onclick=()=>{$('scanResult').innerHTML='';message('ข้ามกระดาษที่ตรวจแล้ว')};
+  ExamUI.toast('พบกระดาษที่ตรวจแล้ว','warning');return {status:'duplicate',studentId};
+ }
+ if(!fromPdf)showSaved(result);
+ return {status:'saved',studentId,score:result.score};
 }
 function showSaved(r){
  $('scanResult').innerHTML=`<div class="card"><div class="sub">บันทึกคะแนนสำเร็จ</div><h3>${esc(r.student.name)} — ${esc(r.student.room)}</h3><div class="score">${r.complete?r.score+' / '+r.fullScore:'แผ่น '+r.pageNo+'/'+r.totalPages+' = '+r.pageScore+' คะแนน'}</div><p class="sub">${r.complete?'ตรวจครบทุกแผ่นแล้ว':'ยังรอแผ่นอื่น จึงยังไม่คิดคะแนนรวม'} • รหัส ${esc(r.student.studentId)} • บันทึกครั้งที่ ${r.revision}</p></div>`;

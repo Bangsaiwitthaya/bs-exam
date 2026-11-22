@@ -6,10 +6,10 @@ window.OMRLayout=Object.freeze({
  forCount(total){
   const q=Number(total);
   if(!Number.isInteger(q)||q<1||q>100)throw Error('ต้องมีข้อสอบ 1–100 ข้อ');
-  const columns=q<=30?2:q<=60?3:4;
+  const columns=4;
   const rows=Math.ceil(q/columns);
-  const pitch=Math.min(columns===4?6.35:8.7, (256-105)/Math.max(1,rows-1));
-  const radius=columns===4?2.38:3.0;
+  const pitch=6.25;
+  const radius=2.35;
   const baseXs=columns===4?[27,73,119,165]:columns===3?[31,91,151]:[53,133];
   const choicePitch=columns===4?6.15:columns===3?7.5:8.7;
   return {columns,rows,pitch,radius,baseXs,choicePitch,y0:105,

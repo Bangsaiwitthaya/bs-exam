@@ -7,3 +7,10 @@
 @media(max-width:850px){.feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:570px){.feature-grid{grid-template-columns:1fr}.home-hero{padding:24px}.feature-card{min-height:125px}.site-nav{display:grid;grid-template-columns:1fr 1fr}.site-nav a{grid-column:1/-1}.site-nav a,.site-nav button{font-size:12px;text-align:center}}
 
 .swal2-container,.swal2-popup,.swal2-title,.swal2-html-container,.swal2-confirm,.swal2-cancel{font-family:'Sarabun',sans-serif!important}
+/* V4: concise, separate workflows and accessible mobile scanner */
+.site-nav{display:flex;flex-wrap:wrap}.site-nav [data-route]{background:#eef3fb;color:#183a70;border:1px solid #d9e4f2}.site-nav [data-route].active{background:#163c84;color:#fff}
+.route-page{scroll-margin-top:12px}.route-page h2{color:#163d7e}.exam-selected{padding-bottom:8px;border-bottom:1px solid #e3eaf3;margin-bottom:14px}
+.mode-tools{padding-top:4px}.pdf-import{border-top:1px solid #dce5ee;padding-top:17px;margin-top:25px}.pdf-import input{max-width:100%;display:block;margin:10px 0}.pdf-import #pdfProgress{padding:8px 0;white-space:pre-line}
+.essay-upload{font-size:12px}.essay-preview{max-width:100px;max-height:85px;object-fit:contain;display:block;margin:5px 0}
+#scanner{position:relative;max-width:700px;margin:auto}#video{width:100%;max-width:unset;max-height:78svh;aspect-ratio:auto;object-fit:contain}#scanner .row{margin:12px 0}#report{margin:15px 0}
+@media(max-width:650px){.site-nav{display:grid;grid-template-columns:1fr 1fr}.site-nav a{grid-column:1/-1}.feature-grid{grid-template-columns:1fr}.head-inner{padding:12px}.head-brand h1{font-size:18px}.card{margin-bottom:11px}.pdf-import{margin-top:16px}#scanTools #keyInputs{max-height:50vh;overflow:auto}}

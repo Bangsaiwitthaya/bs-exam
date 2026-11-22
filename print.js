@@ -30,11 +30,11 @@ const OMRPrint=(()=>{
    txt(20,55,`เลขประจำตัว ${s.studentId||'................'}`,3.45,'font-weight="600"'),
    line(123,20,123,92,'.35','#999'),
    txt(130,29,'รหัสนักเรียน 5 หลัก',3.8,'font-weight="700"'),
-   txt(130,34,blank?'กรุณาฝนรหัสให้ครบ 5 หลัก':'ฝนรหัสล่วงหน้าแล้ว',2.7),
+   txt(130,34,blank?'ฝนตัวเลขให้ครบทุกหลัก':'',2.7),
   ];
   return parts.join('');
  }
- function omrPage(e,st){
+ function omrPage(e,st,essayOverlay=''){
   const s=st||{},count=Number(e.numQuestions),opts=[...e.choiceSet];
   const layout=OMRLayout.forCount(count),idLayout=OMRLayout.student,parts=[];
   for(const [x,y] of [[10,10],[192,10],[10,279],[192,279]])parts.push(rect(x,y,8,8));
@@ -67,7 +67,29 @@ const OMRPrint=(()=>{
   parts.push(line(20,266,190,266,'.24','#aaa'),txt(20,272,`ชุดข้อสอบ ${String(e.examId).slice(0,8)} · 1/1 · ${count} ข้อ`,2.9),
     txt(20,275.5,'พิมพ์ขนาดจริง 100% ห้ามย่อหน้า/ปรับ Fit to page',2.65));
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="210mm" height="297mm" viewBox="0 0 210 297" role="img" aria-label="กระดาษคำตอบ OMR">${parts.join('')}</svg>`;
-  return `<section class="page omr-page" data-sheet="1" data-questions="${count}">${svg}</section>`;
+  return `<section class="page omr-page" data-sheet="1" data-questions="${count}">${svg}${essayOverlay}</section>`;
+ }
+ function essayBlock(e,question,index,lines){
+   const image=e.essayImages?.[index];
+   return `<div class="essay-block"><div class="essay-question">ข้อ ${index+1}. ${esc(question)}</div>${image?`<img class="essay-image" src="${image}" alt="ภาพประกอบโจทย์">`:''}<div class="essay-lines">${Array.from({length:lines},()=>'<div class="answer-line"></div>').join('')}</div></div>`;
+ }
+ function inlineEssay(e){
+  if(e.essayMode!=='same'||!e.essayQuestions?.length)return {html:'',skip:0};
+  const layout=OMRLayout.forCount(Number(e.numQuestions));
+  const top=Math.max(111+layout.pitch*(layout.rows-1)+12,114);
+  const available=264-top;
+  if(available<23)return {html:'',skip:0};
+  let html='',used=0,skip=0;
+  const lines=Math.min(20,Math.max(2,Number(e.essayLines)||8));
+  for(let i=0;i<e.essayQuestions.length;i++){
+   const q=e.essayQuestions[i];
+   // conservative space estimate, never overlap OMR; long text/images move to essay page
+   const image=e.essayImages?.[i];const questionHeight=6*Math.max(1,Math.ceil(String(q).length/95));
+   const need=questionHeight+Math.min(lines,6)*7+(image?37:0)+9;
+   if(used+need>available)break;
+   html+=essayBlock(e,q,i,Math.min(lines,6));used+=need;skip++;
+  }
+  return {html:html?`<div class="omr-inline-essay" style="top:${top}mm"><strong>ตอนที่ 2 ข้อสอบอัตนัย</strong>${html}</div>`:'',skip};
  }
  function essayPages(e,s,skip=0){
   const questions=(e.essayQuestions?.length?e.essayQuestions:Array.from({length:Number(e.essayCount)||0},(_,i)=>`คำตอบอัตนัยข้อ ${i+1}`)).slice(skip).map(x=>String(x||''));
@@ -77,7 +99,7 @@ const OMRPrint=(()=>{
   // At most 2 short-answer blocks/page, but long responses use one/page.
   const perPage=maxLines<=7?2:1,pages=[];
   for(let i=0;i<questions.length;i+=perPage){
-    const blocks=questions.slice(i,i+perPage).map((question,j)=>`<div class="essay-block"><div class="essay-question">ข้อ ${i+j+1+skip}. ${esc(question)}</div><div class="essay-lines">${Array.from({length:maxLines},()=>'<div class="answer-line"></div>').join('')}</div></div>`).join('');
+    const blocks=questions.slice(i,i+perPage).map((question,j)=>essayBlock(e,question,i+j+skip,maxLines)).join('');
     pages.push(`<section class="page essay-page"><div class="essay-head"><strong>โรงเรียนบางไทรวิทยา — กระดาษคำตอบอัตนัย</strong><div>${esc(e.subjectName)} (${esc(e.subjectCode)}) · ${esc(e.examType)} · ${esc(e.semester)}/${esc(e.academicYear)}</div><div>ชื่อ–สกุล ${esc(s.name||'...........................................')} · ชั้น ${esc(s.room||'........')} · รหัส ${esc(s.studentId||'........')}</div></div><p class="essay-instruction">ตอนที่ 2 ข้อสอบอัตนัย — ครูตรวจด้วยตนเอง ไม่บันทึกคะแนนในระบบ</p>${blocks}<div class="essay-foot">ชุดข้อสอบ ${esc(String(e.examId).slice(0,8))} · หน้าอัตนัย ${Math.floor(i/perPage)+1}</div></section>`);
   }
   return pages;
@@ -89,16 +111,30 @@ const OMRPrint=(()=>{
   const pages=[];
   students.forEach(st=>{
     const s=st||{};
-    pages.push(omrPage(exam,s));
-    // อัตนัยแยกหน้าจาก OMR เพื่อคงแม่แบบ 100 ข้อต่อหนึ่งแผ่นและรักษาความแม่นยำ
-    pages.push(...essayPages(exam,s,0));
+    const inline=inlineEssay(exam);pages.push(omrPage(exam,s,inline.html));
+    pages.push(...essayPages(exam,s,exam.essayMode==='same'?inline.skip:0));
   });
   const css=`@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap');
- @page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;color:#111;font-family:'Sarabun',sans-serif} .page{width:210mm;height:297mm;overflow:hidden;position:relative;break-after:page;page-break-after:always;background:#fff} .page:last-child{break-after:auto;page-break-after:auto} .omr-page svg{display:block;width:210mm;height:297mm} .essay-page{padding:18mm 19mm 16mm} .essay-head{line-height:1.7;border-bottom:1px solid #222;padding-bottom:4mm;font-size:11pt}.essay-head strong{font-size:16pt}.essay-instruction{font-weight:700;font-size:11pt;margin:6mm 0}.essay-block{margin:7mm 0}.essay-question{font-size:12pt;font-weight:600;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}.essay-lines{margin-top:3mm}.answer-line{height:8mm;border-bottom:.23mm solid #777}.essay-foot{position:absolute;bottom:14mm;font-size:9pt;right:19mm;color:#555}@media screen{body{background:#e9edf3}.page{margin:12px auto;box-shadow:0 3px 15px #8888}}`;
+ @page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;color:#111;font-family:'Sarabun',sans-serif} .page{width:210mm;height:297mm;overflow:hidden;position:relative;break-after:page;page-break-after:always;background:#fff} .page:last-child{break-after:auto;page-break-after:auto} .omr-page svg{display:block;width:210mm;height:297mm} .essay-page{padding:18mm 19mm 16mm} .essay-head{line-height:1.7;border-bottom:1px solid #222;padding-bottom:4mm;font-size:11pt}.essay-head strong{font-size:16pt}.essay-instruction{font-weight:700;font-size:11pt;margin:6mm 0}.essay-block{margin:7mm 0}.essay-question{font-size:12pt;font-weight:600;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}.essay-lines{margin-top:3mm}.answer-line{height:8mm;border-bottom:.23mm solid #777}.essay-image{display:block;max-width:100%;max-height:34mm;object-fit:contain;margin:2mm auto}.omr-inline-essay{position:absolute;left:20mm;width:170mm;font-size:9pt;line-height:1.25}.omr-inline-essay .essay-block{margin:2mm 0}.omr-inline-essay .essay-question{font-size:9pt}.omr-inline-essay .answer-line{height:6.2mm}.essay-foot{position:absolute;bottom:14mm;font-size:9pt;right:19mm;color:#555}@media screen{body{background:#e9edf3}.page{margin:12px auto;box-shadow:0 3px 15px #8888}}`;
   w.document.open();w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>กระดาษคำตอบ ${esc(exam.subjectCode)}</title><style>${css}</style></head><body>${pages.join('')}</body></html>`);w.document.close();
   // Allow the web font to load before print dialog. Printed SVG uses real black fills,
   // so calibration squares, bubbles, and letters do not need "Print backgrounds".
   Promise.race([w.document.fonts?.ready||Promise.resolve(),new Promise(res=>setTimeout(res,2200))]).then(()=>{try{if(!w.closed){w.focus();w.print()}}catch(_){}});
  }
- return {print};
+ async function pngBlank(exam){
+  if(!window.QRCode)throw Error('ยังโหลด QR Code ไม่สำเร็จ');
+  const html=omrPage(exam,{},'');const host=document.createElement('div');host.innerHTML=html;
+  const svg=host.querySelector('svg');if(!svg)throw Error('สร้างภาพไม่สำเร็จ');
+  const serialized=new XMLSerializer().serializeToString(svg);
+  const blob=new Blob([serialized],{type:'image/svg+xml;charset=utf-8'});const url=URL.createObjectURL(blob);
+  try{
+   const image=new Image();await new Promise((ok,fail)=>{image.onload=ok;image.onerror=()=>fail(Error('แปลงกระดาษคำตอบเป็นรูปภาพไม่สำเร็จ'));image.src=url});
+   // A4 at 300 DPI; PNG for insertion into Word
+   const canvas=document.createElement('canvas');canvas.width=2480;canvas.height=3508;
+   const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);
+   const png=await new Promise(ok=>canvas.toBlob(ok,'image/png'));if(!png)throw Error('บันทึก PNG ไม่สำเร็จ');
+   const a=document.createElement('a');a.href=URL.createObjectURL(png);a.download='OMR-blank-'+exam.subjectCode+'-'+exam.numQuestions+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  }finally{URL.revokeObjectURL(url)}
+ }
+ return {print,pngBlank};
 })();
