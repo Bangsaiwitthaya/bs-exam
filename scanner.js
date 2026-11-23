@@ -2,6 +2,10 @@
 let omrLoopId=null,omrCandidate='',omrRepeat=0,omrMissing=0;
 let omrResultOpen=false,omrAwaitRemoval=false,omrOverlayId=null,omrSavedThisSession=0;
 let omrTorchTrack=null,omrTorchOn=false;
+// Display only: observed image-processing time; no server performance claims.
+let omrProcessMs=0;
+let omrReviewPending=false; // Prevent another camera read while the teacher reviews the marked answer image.
+
 function scanState(s){const el=document.getElementById('scanRunState');if(el)el.textContent=s;}
 function scanStatus(result){
  $('scanExamLabel').textContent=`${S.exam.subjectName} • ${S.exam.examType}`;
@@ -58,13 +62,13 @@ async function startCamera(){
  if(!navigator.mediaDevices?.getUserMedia)throw Error('เบราว์เซอร์หรือ HTTPS ไม่รองรับกล้อง');
  if(!window.cv?.Mat||!window.jsQR)throw Error('OpenCV.js / jsQR ยังโหลดไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง');
  stopCamera();S.stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1600},height:{ideal:1200}}});
- omrTorchTrack=S.stream.getVideoTracks()[0]||null;omrTorchOn=false;updateTorchUi();$('video').srcObject=S.stream;await $('video').play();$('scanner').classList.remove('hidden');S.lastPaper='';omrCandidate='';omrRepeat=0;omrSavedThisSession=0;omrAwaitRemoval=false;omrResultOpen=false;scanStatus();scanState('พร้อมสแกน');message('เปิดกล้องแล้ว วางกระดาษให้อยู่ในภาพทั้งแผ่น');ExamUI.toast('เปิดกล้องแล้ว พร้อมสแกน','info');
- const loop=async()=>{if(!S.stream)return;if($('auto').checked&&!S.processing){try{await scanFrame()}catch(e){message(e.message||String(e),true)}}if(S.stream)omrLoopId=setTimeout(loop,1100)};loop();
+ omrTorchTrack=S.stream.getVideoTracks()[0]||null;omrTorchOn=false;updateTorchUi();$('video').srcObject=S.stream;await $('video').play();$('scanner').classList.remove('hidden');S.lastPaper='';omrCandidate='';omrRepeat=0;omrSavedThisSession=0;omrAwaitRemoval=false;omrResultOpen=false;omrReviewPending=false;scanStatus();scanState('พร้อมสแกน');message('เปิดกล้องแล้ว วางกระดาษให้อยู่ในภาพทั้งแผ่น');ExamUI.toast('เปิดกล้องแล้ว พร้อมสแกน','info');
+ const loop=async()=>{if(!S.stream)return;if($('auto').checked&&!S.processing&&!omrResultOpen&&!omrReviewPending){try{await scanFrame()}catch(e){message(e.message||String(e),true)}}if(S.stream)omrLoopId=setTimeout(loop,550)};loop();
 }
-function stopCamera(){omrTorchTrack=null;omrTorchOn=false;updateTorchUi('ปิดกล้องแล้ว');resetResultOverlay();omrResultOpen=false;omrAwaitRemoval=false;omrCandidate='';omrRepeat=0;if(omrLoopId)clearTimeout(omrLoopId);omrLoopId=null;if(S.stream)S.stream.getTracks().forEach(t=>t.stop());S.stream=null;$('scanner').classList.add('hidden')}
+function stopCamera(){omrTorchTrack=null;omrTorchOn=false;updateTorchUi('ปิดกล้องแล้ว');resetResultOverlay();omrResultOpen=false;omrAwaitRemoval=false;omrReviewPending=false;omrCandidate='';omrRepeat=0;if(omrLoopId)clearTimeout(omrLoopId);omrLoopId=null;if(S.stream)S.stream.getTracks().forEach(t=>t.stop());S.stream=null;$('scanner').classList.add('hidden')}
 function omrReadFrame(canvas,exam){
  const cv=window.cv;
- let original=null,gray=null,binary=null,contours=null,hierarchy=null,warped=null,warpedGray=null,src=null,dst=null,M=null;
+ let original=null,gray=null,binary=null,contours=null,hierarchy=null,warped=null,warpedGray=null,warpedAdaptive=null,qrCrop=null,src=null,dst=null,M=null;
  try{
   original=cv.imread(canvas);gray=new cv.Mat();cv.cvtColor(original,gray,cv.COLOR_RGBA2GRAY);
   binary=new cv.Mat();cv.threshold(gray,binary,105,255,cv.THRESH_BINARY_INV);
@@ -91,14 +95,23 @@ function omrReadFrame(canvas,exam){
   dst=cv.matFromArray(4,1,cv.CV_32FC2,[14*4,14*4,196*4,14*4,196*4,283*4,14*4,283*4]);
   M=cv.getPerspectiveTransform(src,dst);warped=new cv.Mat();cv.warpPerspective(original,warped,M,new cv.Size(w,h),cv.INTER_LINEAR,cv.BORDER_CONSTANT,new cv.Scalar(255,255,255,255));
   warpedGray=new cv.Mat();cv.cvtColor(warped,warpedGray,cv.COLOR_RGBA2GRAY);
-  // read QR from same rectified image
-  const qrcanvas=document.createElement('canvas');qrcanvas.width=w;qrcanvas.height=h;cv.imshow(qrcanvas,warped);
-  const ctx=qrcanvas.getContext('2d',{willReadFrequently:true});const im=ctx.getImageData(0,0,w,h);
-  const qr=jsQR(im.data,w,h,{inversionAttempts:'dontInvert'});
+  // Only decode the QR area (20..45 mm by 55..80 mm), not a full 840x1188-pixel image.
+  // Generous margin allows for print scaling and minor misregistration.
+  const qrRect=new cv.Rect(15*4,50*4,40*4,40*4);
+  qrCrop=warped.roi(qrRect);
+  const qrcanvas=document.createElement('canvas');qrcanvas.width=qrRect.width;qrcanvas.height=qrRect.height;
+  cv.imshow(qrcanvas,qrCrop);
+  const ctx=qrcanvas.getContext('2d',{willReadFrequently:true});const im=ctx.getImageData(0,0,qrRect.width,qrRect.height);
+  const qr=jsQR(im.data,qrRect.width,qrRect.height,{inversionAttempts:'dontInvert'});
+  // Local threshold handles pale graphite marks and uneven illumination much better
+  // than the previous fixed gray<135 criterion. Printed bubble outlines stay outside
+  // the smaller central sampling disk.
+  warpedAdaptive=new cv.Mat();
+  cv.adaptiveThreshold(warpedGray,warpedAdaptive,255,cv.ADAPTIVE_THRESH_GAUSSIAN_C,cv.THRESH_BINARY_INV,35,9);
   let qrExam='',qrStudent='',qrPage=0;if(qr?.data?.startsWith('BSOMR2|')){const a=qr.data.split('|');qrExam=a[1];qrStudent=a[2]||'';qrPage=Number(a[3])||0;}
   function darkRatio(xmm,ymm,rmm){
     const x=Math.round(xmm*4),y=Math.round(ymm*4),R=Math.round(rmm*4);let count=0,dark=0;
-    for(let yy=-R;yy<=R;yy++)for(let xx=-R;xx<=R;xx++)if(xx*xx+yy*yy<=R*R){let X=x+xx,Y=y+yy;if(X>=0&&X<w&&Y>=0&&Y<h){count++;if(warpedGray.ucharPtr(Y,X)[0]<135)dark++}}
+    for(let yy=-R;yy<=R;yy++)for(let xx=-R;xx<=R;xx++)if(xx*xx+yy*yy<=R*R){let X=x+xx,Y=y+yy;if(X>=0&&X<w&&Y>=0&&Y<h){count++;if(warpedAdaptive.ucharPtr(Y,X)[0]>0)dark++}}
     return count?dark/count:0;
   }
   const choice=[...exam.choiceSet];let answers=[],uncertain=[];
@@ -111,9 +124,9 @@ function omrReadFrame(canvas,exam){
     // This avoids silently treating two genuinely dark bubbles as one answer.
     const ranked=ratios.map((v,i)=>({v,i})).sort((a,b)=>b.v-a.v);
     const top=ranked[0],next=ranked[1]||{v:0};
-    const clear=top.v>=0.22 && (top.v-next.v)>=0.10 && (next.v===0||top.v/next.v>=1.32);
+    const clear=top.v>=0.22 && (top.v-next.v)>=0.11 && (next.v===0||top.v/Math.max(next.v,0.01)>=1.38);
     if(clear)answers.push(choice[top.i]);
-    else if(top.v<0.13)answers.push('');
+    else if(top.v<0.12)answers.push('');
     else{answers.push('');uncertain.push(q+1)}
   }
   // numeric ID grid (5 digits, optional redundancy for named and blank papers)
@@ -124,17 +137,22 @@ function omrReadFrame(canvas,exam){
     const marked=ratios.map((v,i)=>({v,i})).filter(x=>x.v>.40);
     if(marked.length===1)digits+=marked[0].i;else idReadable=false;
   }
-  return {qrExam,qrStudent,qrPage,pageNo,studentDigits:idReadable?digits:'',answers,uncertain:uncertain.map(x=>x+start)};
- }finally{for(const o of [original,gray,binary,contours,hierarchy,warped,warpedGray,src,dst,M])if(o)o.delete()}
+  // Capture a normalized image for the review overlay. The QR and bubbles stay at
+  // known A4 coordinates, so indicator rings cannot drift when the phone is tilted.
+  const previewCanvas=document.createElement('canvas');
+  cv.imshow(previewCanvas,warped);
+  const previewImage=previewCanvas.toDataURL('image/jpeg',0.78);
+  return {qrExam,qrStudent,qrPage,pageNo,studentDigits:idReadable?digits:'',answers,uncertain:uncertain.map(x=>x+start),previewImage};
+ }finally{for(const o of [original,gray,binary,contours,hierarchy,warped,warpedGray,warpedAdaptive,qrCrop,src,dst,M])if(o)o.delete()}
 }
 async function scanFrame(){
- if(!S.stream||S.processing||omrResultOpen)return;
+ if(!S.stream||S.processing||omrResultOpen||omrReviewPending)return;
  S.processing=true;
  try{
   const video=$('video');if(video.readyState<2)return;
-  const cvs=$('capture');const max=1800,scale=Math.min(1,max/video.videoWidth);cvs.width=Math.round(video.videoWidth*scale);cvs.height=Math.round(video.videoHeight*scale);
+  const cvs=$('capture');const max=1280,scale=Math.min(1,max/video.videoWidth);cvs.width=Math.round(video.videoWidth*scale);cvs.height=Math.round(video.videoHeight*scale);
   cvs.getContext('2d',{willReadFrequently:true}).drawImage(video,0,0,cvs.width,cvs.height);
-  const read=omrReadFrame(cvs,S.exam);
+  const started=performance.now();const read=omrReadFrame(cvs,S.exam);omrProcessMs=Math.round(performance.now()-started);
   if(!read){omrMissing++;if(omrMissing>=2){S.lastPaper='';omrCandidate='';omrRepeat=0;if(omrAwaitRemoval&&!omrResultOpen){omrAwaitRemoval=false;scanState('พร้อมสแกน');}}return;}
   omrMissing=0;
   if(omrAwaitRemoval){scanState('ยกกระดาษออกก่อน');return;}
@@ -148,15 +166,18 @@ async function handleOMRRead(read,fromPdf=false){
  const studentId=read.qrStudent|| (matched.length===1?matched[0].studentId:'') || (fromPdf?'':$('manualStudent').value);
  if(read.qrStudent && matched.length===1 && matched[0].studentId!==read.qrStudent)throw Error('รหัสวงดำไม่ตรงกับ QR');
  if(!studentId)throw Error('อ่านรหัสนักเรียนไม่ได้');
- if(read.uncertain.length)throw Error('คำตอบไม่ชัด/ฝนหลายตัวเลือก ข้อ '+read.uncertain.join(', '));
- if(!read.answers.some(Boolean))throw Error('ระบบอ่านคำตอบเป็นช่องว่างทั้งหมด กรุณาจัดแสงและระยะกล้องใหม่ (ยังไม่บันทึกคะแนน)');
- const signature=studentId+'|1|'+read.answers.join(',');
+ if(fromPdf && read.uncertain.length)throw Error('คำตอบไม่ชัด/ฝนหลายตัวเลือก ข้อ '+read.uncertain.join(', '));
+ if(fromPdf && !read.answers.some(Boolean))throw Error('ระบบอ่านคำตอบว่างทั้งหมด ไม่บันทึกคะแนน');
+ const signature=studentId+'|1|'+read.answers.join(',')+'|'+read.uncertain.join(',');
  if(!fromPdf){
   if(omrResultOpen||omrAwaitRemoval)return {status:'waiting-removal'};
   if(omrCandidate===signature)omrRepeat++;else{omrCandidate=signature;omrRepeat=1;}
-  if(omrRepeat<2){message('กำลังยืนยันผลภาพอีกครั้ง');return {status:'unstable'}};
+  if(omrRepeat<2){scanState('อ่านภาพแล้ว กำลังยืนยันอีกเฟรม');return {status:'unstable'}};
   if(S.lastPaper===studentId+'|1')return {status:'same-paper'};
-  S.lastPaper=studentId+'|1';
+  // Do not mark the paper consumed until the teacher has confirmed the preview.
+  omrReviewPending=true;
+  await showOmrReview(read,studentId);
+  return {status:'review'};
  }
  const result=await api('scan',{examId:S.exam.examId,studentId,pageNo:1,answers:read.answers});
  if(result.duplicate){
@@ -176,6 +197,86 @@ async function handleOMRRead(read,fromPdf=false){
  if(!result.complete)throw Error('เซิร์ฟเวอร์บันทึกเป็น PARTIAL ไม่ใช่ผลตรวจสมบูรณ์ กรุณาตรวจว่าติดตั้ง Apps Script V4.4 และเลือกตรวจสอบผลค้างในหน้ารายงาน');
  if(!fromPdf)showSaved(result);
  return {status:'saved',studentId,score:result.score};
+}
+/** OMR overlay: BLUE is the candidate read (in legend only), GREEN correct,
+ * RED wrong, YELLOW unresolved. Scores are not saved until confirmation.
+ * Image coordinates are a normalized 840x1188 image (4 px per mm).
+ */
+async function showOmrReview(read,studentId){
+ const student=S.students.find(x=>String(x.studentId)===String(studentId));
+ const choices=[...S.exam.choiceSet];
+ const answers=read.answers.slice();
+ const uncertain=new Set(read.uncertain);
+ const layout=OMRLayout.forCount(answers.length);
+ const examKey=S.exam.answerKey||[];
+ const overlay=document.createElement('div');
+ overlay.className='omr-review-backdrop';overlay.id='omrReviewDialog';
+ overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','ตรวจสอบคำตอบก่อนบันทึก');
+ overlay.innerHTML=`<section class="omr-review-panel"><header><div><strong>ตรวจสอบการอ่านคำตอบ</strong><small>${esc(student?.name||studentId)} • ${esc(student?.room||'')} • ${esc(studentId)}</small></div><button type="button" class="omr-review-close" id="omrCancelReview" aria-label="ยกเลิก">✕</button></header><div class="omr-review-legend"><span class="omr-lgreen">● ตอบถูก</span><span class="omr-lred">● ตอบผิด</span><span class="omr-lyellow">● ไม่ชัด / ต้องยืนยัน</span></div><div class="omr-review-image-wrap"><canvas id="omrReviewCanvas"></canvas></div><div id="omrReviewStats" class="omr-review-stats"></div><div class="omr-review-note">แตะข้อที่ต้องการเปลี่ยนคำตอบด้านล่าง • กรณีไม่ชัดต้องยืนยันคำตอบก่อนบันทึก</div><div id="omrReviewAnswers" class="omr-review-answers"></div><footer><button type="button" class="secondary" id="omrRescanReview">สแกนใหม่</button><button type="button" id="omrConfirmReview">ยืนยันและบันทึกคะแนน</button></footer></section>`;
+ document.body.appendChild(overlay);setResultLock(true);
+ const image=new Image();
+ let closed=false;
+ const close=()=>{if(closed)return;closed=true;overlay.remove();omrReviewPending=false;setResultLock(false);omrCandidate='';omrRepeat=0;scanState('พร้อมสแกน');};
+ document.getElementById('omrCancelReview').onclick=close;
+ document.getElementById('omrRescanReview').onclick=close;
+ const canvas=overlay.querySelector('#omrReviewCanvas');const ctx=canvas.getContext('2d');
+ const show=()=>{
+  if(closed)return;
+  canvas.width=840;canvas.height=1188;
+  ctx.drawImage(image,0,0,canvas.width,canvas.height);
+  for(let q=0;q<answers.length;q++){
+   const answer=answers[q], key=String(examKey[q]||'');
+   const choiceIndex=choices.indexOf(answer);
+   const pending=uncertain.has(q+1);
+   // Ring the selected choice; for unknown answer ring the whole item area in amber.
+   if(choiceIndex>=0){
+    const pt=layout.position(q,choiceIndex);
+    ctx.beginPath();ctx.arc(pt.x*4,pt.y*4,(layout.radius+1.05)*4,0,2*Math.PI);
+    ctx.lineWidth=4.2;ctx.strokeStyle=pending?'#eab308':answer===key?'#16a34a':'#ef4444';ctx.stroke();
+   }else if(pending){
+    const pt=layout.position(q,0);
+    ctx.strokeStyle='#eab308';ctx.lineWidth=3.5;
+    ctx.strokeRect((pt.x-13)*4,(pt.y-3.7)*4,(11+choices.length*layout.choicePitch)*4,7.4*4);
+   }
+  }
+  const correct=answers.filter((a,i)=>a&&!uncertain.has(i+1)&&a===examKey[i]).length;
+  const wrong=answers.filter((a,i)=>a&&!uncertain.has(i+1)&&a!==examKey[i]).length;
+  const unresolved=uncertain.size;
+  overlay.querySelector('#omrReviewStats').textContent=`ถูก ${correct} ข้อ • ผิด ${wrong} ข้อ • ไม่ชัด ${unresolved} ข้อ • เว้นว่าง ${answers.filter(a=>!a).length} ข้อ`;
+  overlay.querySelector('#omrConfirmReview').disabled=unresolved>0||!answers.some(Boolean);
+  const host=overlay.querySelector('#omrReviewAnswers');host.innerHTML='';
+  for(let q=0;q<answers.length;q++){
+   const row=document.createElement('div');row.className='omr-review-item'+(uncertain.has(q+1)?' warning':'');
+   const title=document.createElement('span');title.textContent=`ข้อ ${q+1} • เฉลย ${examKey[q]||'—'}`;row.appendChild(title);
+   const select=document.createElement('select');select.setAttribute('aria-label',`แก้คำตอบข้อ ${q+1}`);
+   const empty=document.createElement('option');empty.value='';empty.textContent=uncertain.has(q+1)?'⚠ ยังไม่ชัด':'เว้นว่าง';select.appendChild(empty);if(uncertain.has(q+1)){const blank=document.createElement('option');blank.value='__BLANK__';blank.textContent='ยืนยันเว้นว่าง';select.appendChild(blank);}
+   for(const ch of choices){const opt=document.createElement('option');opt.value=ch;opt.textContent=ch;select.appendChild(opt)}
+   select.value=answers[q]||'';
+   select.onchange=()=>{answers[q]=select.value==='__BLANK__'?'':select.value;uncertain.delete(q+1);show()};
+   row.appendChild(select);host.appendChild(row);
+  }
+ };
+ image.onload=show;
+ image.onerror=()=>{close();ExamUI?.alert?.('ไม่สามารถเปิดภาพตรวจทาน','กรุณาสแกนใหม่','error')};
+ image.src=read.previewImage;
+ overlay.querySelector('#omrConfirmReview').onclick=async()=>{
+  if(uncertain.size||!answers.some(Boolean))return;
+  const button=overlay.querySelector('#omrConfirmReview');button.disabled=true;button.textContent='กำลังบันทึก…';
+  try{
+   // The whole normalized image and choices are reviewed before this server write.
+   // The same duplicate/revision API contract as existing scanner.js is preserved.
+   const result=await api('scan',{examId:S.exam.examId,studentId,pageNo:1,answers});
+   if(result.duplicate){
+    const choice=window.Swal?.fire?await Swal.fire({icon:'warning',title:'นักเรียนคนนี้ตรวจแล้ว',html:`${esc(student?.name||studentId)}<br>คะแนนเดิม ${esc(result.previous?.score)} — ต้องการแทนที่หรือไม่?`,showCancelButton:true,confirmButtonText:'ยืนยันตรวจซ้ำ',cancelButtonText:'ไม่แทนที่',allowOutsideClick:false}):{isConfirmed:window.confirm('ตรวจแล้ว ต้องการแทนคะแนนเดิมหรือไม่?')};
+    if(!choice.isConfirmed){close();omrAwaitRemoval=true;return}
+    const revised=await api('scan',{examId:S.exam.examId,studentId,pageNo:1,answers,replace:true,expectedRevision:result.previous.revision});
+    if(!revised.complete)throw Error('เซิร์ฟเวอร์ยังไม่ยืนยันคะแนนรวม');
+    close();S.lastPaper=studentId+'|1';showSaved(revised,{replacement:true});return;
+   }
+   if(!result.complete)throw Error('ระบบยังไม่ได้คะแนนสมบูรณ์ (PARTIAL) กรุณาตรวจ Apps Script');
+   close();S.lastPaper=studentId+'|1';showSaved(result);
+  }catch(e){button.disabled=false;button.textContent='ยืนยันและบันทึกคะแนน';if(window.Swal?.fire)await Swal.fire({icon:'error',title:'บันทึกไม่สำเร็จ',text:e.message||String(e)});else window.alert(e.message||String(e));}
+ };
 }
 function showSaved(r,{replacement=false}={}){
  $('scanResult').innerHTML=`<div class="card"><div class="sub">บันทึกคะแนนสำเร็จ</div><h3>${esc(r.student.name)} — ${esc(r.student.room)}</h3><div class="score">${r.complete?r.score+' / '+r.fullScore:'แผ่น '+r.pageNo+'/'+r.totalPages+' = '+r.pageScore+' คะแนน'}</div><p class="sub">${r.complete?'ตรวจครบทุกแผ่นแล้ว':'ยังรอแผ่นอื่น จึงยังไม่คิดคะแนนรวม'} • รหัส ${esc(r.student.studentId)} • บันทึกครั้งที่ ${r.revision}</p></div>`;
