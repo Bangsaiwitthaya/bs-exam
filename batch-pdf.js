@@ -5,6 +5,9 @@ window.OMRBatch=(()=>{
   if(running)throw Error('กำลังตรวจ PDF อีกไฟล์อยู่');
   if(!S.exam)throw Error('กรุณาเลือกชุดข้อสอบก่อน');
   if(S.exam.answerKey.length!==S.exam.numQuestions)throw Error('กรุณาบันทึกเฉลยให้ครบก่อนตรวจ PDF');
+  let health;
+  try{health=await api('health')}catch(e){throw Error('กรุณา Deploy Apps Script V4.4 ก่อนตรวจ PDF ('+e.message+')')}
+  if(health?.release!=='4.4-singlepage'||Number(health.pageSize)!==100||!health.onePage)throw Error('Apps Script ยังไม่ใช่ V4.4 กรุณา Deploy เป็น New version ก่อนตรวจ PDF');
   if(!window.pdfjsLib||!window.cv?.Mat||!window.jsQR)throw Error('ไลบรารี PDF/OMR ยังโหลดไม่สำเร็จ');
   const file=$('pdfFile').files[0];if(!file)throw Error('กรุณาเลือกไฟล์ PDF');
   if(file.size>40*1024*1024)throw Error('ไฟล์ใหญ่เกิน 40 MB กรุณาแบ่ง PDF');

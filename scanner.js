@@ -33,6 +33,12 @@ function resetResultOverlayTimer(){if(omrOverlayId)clearTimeout(omrOverlayId);om
 
 async function startCamera(){
  if(!S.exam)throw Error('กรุณาเลือกข้อสอบ');
+ // ป้องกัน GitHub V4.4 คุยกับ Apps Script รุ่น 50 ข้อ/แผ่นซึ่งจะบันทึก PARTIAL
+ let health;
+ try{health=await api('health')}catch(e){throw Error('ไม่สามารถตรวจเวอร์ชัน Apps Script ได้ กรุณา Deploy OMR_Api.gs V4.4 เป็น New version ก่อนเปิดกล้อง ('+e.message+')')}
+ if(!health?.onePage||Number(health.pageSize)!==100||health.release!=='4.4-singlepage')
+   throw Error('Apps Script ที่ Deploy ยังไม่ตรงรุ่น V4.4 (ปัจจุบัน '+String(health?.release||'ไม่ทราบ')+') กรุณา Deploy เป็น New version ก่อนเริ่มสแกน เพื่อป้องกันคะแนนค้าง PARTIAL');
+ if(Number(S.exam.totalPages)!==1)throw Error('API ส่งข้อมูลหลายแผ่นกลับมา กรุณาตรวจเวอร์ชันและเปิดชุดข้อสอบใหม่');
  if(S.exam.answerKey.length!==S.exam.numQuestions)throw Error('ต้องบันทึกเฉลยให้ครบก่อนเริ่มสแกน');
  if(!navigator.mediaDevices?.getUserMedia)throw Error('เบราว์เซอร์หรือ HTTPS ไม่รองรับกล้อง');
  if(!window.cv?.Mat||!window.jsQR)throw Error('OpenCV.js / jsQR ยังโหลดไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง');
@@ -148,7 +154,7 @@ async function handleOMRRead(read,fromPdf=false){
   }finally{if(!didReplace){setResultLock(false);scanState('ยกกระดาษออกก่อน');}}
   return {status:'duplicate',studentId};
  }
- if(!result.complete)throw Error('เซิร์ฟเวอร์ยังไม่ยืนยันการตรวจครบทุกข้อ กรุณาตรวจสอบข้อมูลก่อนบันทึกซ้ำ');
+ if(!result.complete)throw Error('เซิร์ฟเวอร์บันทึกเป็น PARTIAL ไม่ใช่ผลตรวจสมบูรณ์ กรุณาตรวจว่าติดตั้ง Apps Script V4.4 และเลือกตรวจสอบผลค้างในหน้ารายงาน');
  if(!fromPdf)showSaved(result);
  return {status:'saved',studentId,score:result.score};
 }
