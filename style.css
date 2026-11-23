@@ -17,3 +17,16 @@
 
 /* V4.1: Manage saved paper sets */
 .exam-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.exam-actions button{padding:7px 10px;font-size:12px}.danger-action{background:#b91c1c;color:white}#cancelEdit{border:1px solid #cbd5e1}@media(max-width:600px){.exam-actions{flex-direction:column;align-items:stretch}}
+
+/* V4.3: compact camera status and legible scan confirmations */
+.scan-statusbar{background:#142d56;color:#fff;padding:12px 14px;border-radius:13px;display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:9px}
+.scan-statusbar strong{display:block;font-size:15px}.scan-statusbar small{display:block;font-size:12px;color:#d9e7ff;margin-top:4px}
+.scan-state{background:#dbeafe;color:#1e3a8a;border-radius:999px;font-size:12px;font-weight:700;padding:5px 9px;align-self:start}
+.scan-stats{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #ffffff3b;padding-top:8px;text-align:center}
+.scan-stats b{font-size:23px;display:block;font-variant-numeric:tabular-nums}.scan-stats small{margin:0}
+.scan-notify-setting{margin:9px 0 12px;font-weight:600}.scan-notify-setting select{width:100%;font-weight:400}
+.scan-result-overlay{position:sticky;bottom:12px;background:#dcfce7;border:2px solid #16a34a;border-radius:14px;padding:15px;box-shadow:0 4px 26px #1028493b;z-index:5;text-align:center}
+.scan-result-overlay strong{font-size:19px;display:block}.scan-result-overlay b{font-size:31px;color:#065f46;display:block}.scan-result-overlay small{font-size:12px}
+.swal-scan-score{font-size:clamp(42px,12vw,66px);font-weight:800;color:#047857;margin:8px 0;line-height:1.1;font-variant-numeric:tabular-nums}
+.swal-scan-student{font-size:19px;font-weight:700;margin-bottom:6px}.swal-scan-meta{color:#475569;font-size:14px;line-height:1.7}
+@media(max-width:600px){.swal2-popup{width:min(94vw,430px)!important;padding:18px!important}.scan-statusbar{position:sticky;top:0;z-index:4}.scan-notify-setting{font-size:13px}}

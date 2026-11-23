@@ -19,7 +19,7 @@ window.ExamRoute=(()=>{
   if(S.exam)show('currentPanel');else hide('currentPanel');
   if(route==='scan'&&S.exam){const ready=S.exam.answerKey.length===S.exam.numQuestions;document.getElementById('keyStatus').textContent=ready?'มีเฉลยครบ':'รอเฉลย';document.getElementById('keySection').classList.toggle('hidden',ready);}
  }
- document.querySelectorAll('[data-route]').forEach(x=>x.addEventListener('click',()=>navigate(x.dataset.route)));
+ document.querySelectorAll('[data-route]').forEach(x=>x.addEventListener('click',()=>{navigate(x.dataset.route);if(x.dataset.route!=='home')ExamUI.toast('เปิดเมนู '+(x.textContent||'').trim(),'info') }));
  document.getElementById('create').addEventListener('click',()=>{ /* create flow chooses print when done */ });
  document.getElementById('keyToggle').addEventListener('click',()=>document.getElementById('keySection').classList.toggle('hidden'));
  document.getElementById('downloadPng').addEventListener('click',()=>attempt(async()=>{if(!S.exam)throw Error('กรุณาเลือกชุดข้อสอบก่อน');await OMRPrint.pngBlank(S.exam);ExamUI.toast('ดาวน์โหลดรูปภาพ PNG สำเร็จ')}));

@@ -20,7 +20,7 @@ async function startForTeacher(){
  await ExamUI.alert('เข้าสู่ระบบสำเร็จ','คุณกำลังใช้งานในชื่อ '+S.teacher,'success');
 }
 $('login').onclick=()=>attempt(startForTeacher);
-$('logout').onclick=()=>{stopCamera();S.teacher='';S.exam=null;$('workspace').classList.add('hidden');$('loginPanel').classList.remove('hidden');ExamRoute.navigate('create');message('กลับหน้าเลือกครู');ExamUI.toast('กลับหน้าเลือกครูแล้ว','info')};
+$('logout').onclick=()=>attempt(async()=>{if(!await ExamUI.confirm('เปลี่ยนชื่อครู','กลับไปเลือกชื่อครูใหม่ใช่หรือไม่?','เปลี่ยนชื่อครู'))return;stopCamera();S.teacher='';S.exam=null;$('workspace').classList.add('hidden');$('loginPanel').classList.remove('hidden');ExamRoute.navigate('create');message('กลับหน้าเลือกครู');await ExamUI.alert('เปลี่ยนชื่อครูเรียบร้อย','กรุณาเลือกชื่อครูที่ต้องการใช้งาน','success')});
 attempt(async()=>{
   const names=await api('teachers');$('teacher').innerHTML='<option value="">-- เลือกชื่อครู --</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
   message('โหลดรายชื่อครูเรียบร้อย');
@@ -63,7 +63,7 @@ $('create').onclick=()=>attempt(async()=>{
  }
  cancelEdit();message(editing?'แก้ไขชุดข้อสอบสำเร็จ':'สร้างชุดข้อสอบสำเร็จ');
  await ExamUI.alert('บันทึกสำเร็จ',editing?'แก้ไขข้อมูลชุดข้อสอบเรียบร้อยแล้ว':'สร้างชุดข้อสอบเรียบร้อยแล้ว','success');
- await listExams();await openExam(result.examId);ExamRoute.navigate('print');
+ await listExams();await openExam(result.examId,{silent:true});ExamRoute.navigate('print');
 });
 async function editExam(id){
  const e=await api('getExam',{examId:id});
@@ -107,13 +107,15 @@ async function listExams(){
  }
 }
 $('reload').onclick=()=>attempt(listExams);$('reloadCreate').onclick=()=>attempt(listExams);
-async function openExam(id){
- stopCamera();S.exam=await api('getExam',{examId:id});S.students=await api('getStudents',{examId:id});
+async function openExam(id,{silent=false}={}){
+ stopCamera();ExamUI.busy('กำลังเปิดชุดข้อสอบ...');
+ try{S.exam=await api('getExam',{examId:id});S.students=await api('getStudents',{examId:id});}finally{ExamUI.close()}
  const e=S.exam;$('currentPanel').classList.remove('hidden');$('examTitle').textContent=`${e.examType} • ${e.subjectName}`;
  $('examMeta').textContent=`${e.subjectCode} | ${e.academicYear}/${e.semester} | ${e.rooms.join(', ')} | ${e.numQuestions} ข้อ (กระดาษ OMR 1 แผ่น/คน) | นักเรียน ${S.students.length} คน | สแกนแล้ว ${e.scanned} คน`;
  const ch=[...e.choiceSet];$('keyInputs').innerHTML=Array.from({length:e.numQuestions},(_,i)=>`<label>ข้อ ${i+1}<select id="key${i}"><option value="">—</option>${ch.map(c=>`<option value="${esc(c)}" ${e.answerKey[i]===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label>`).join('');
  $('manualStudent').innerHTML='<option value="">อ่านจาก QR อัตโนมัติ</option>'+S.students.map(s=>`<option value="${esc(s.studentId)}">${esc(s.room)} ${esc(s.studentId)} ${esc(s.name)}</option>`).join('');
  $('manualPage').innerHTML=Array.from({length:e.totalPages},(_,i)=>`<option value="${i+1}">แผ่น ${i+1}/${e.totalPages}</option>`).join('');$('scanResult').innerHTML='';$('report').innerHTML='';$('reportRoom').innerHTML='<option value="">รวมทุกห้อง</option>'+e.rooms.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');message('เปิดชุดข้อสอบแล้ว');ExamRoute.afterSelect();
+ if(!silent)await ExamUI.alert('เปิดชุดข้อสอบสำเร็จ',`${e.subjectName} • ${e.numQuestions} ข้อ • ${S.students.length} คน`,'success');
 }
 $('saveKey').onclick=()=>attempt(async()=>{
   const key=Array.from({length:S.exam.numQuestions},(_,i)=>$('key'+i).value);
@@ -127,12 +129,20 @@ $('saveKey').onclick=()=>attempt(async()=>{
   ExamUI.busy('กำลังบันทึกเฉลย...');let r;try{r=await api('saveKey',{examId:S.exam.examId,answerKey:key,confirmRegrade})}finally{ExamUI.close()}
   S.exam.answerKey=key;S.exam.status='READY';$('keyStatus').textContent='มีเฉลยครบ';$('keySection').classList.add('hidden');message('บันทึกเฉลยเรียบร้อย '+(r.regraded?`คำนวณใหม่ ${r.regraded} คน`:''));ExamUI.toast('บันทึกเฉลยสำเร็จ'+(r.regraded?' และคำนวณคะแนนใหม่':''));await listExams();
 });
-$('printNamed').onclick=()=>attempt(()=>{if(!S.students.length)throw Error('ไม่พบรายชื่อนักเรียน');OMRPrint.print(S.exam,S.students);ExamUI.toast('เปิดหน้าพิมพ์ '+S.students.length+' ชุดแล้ว','info')});
-$('printBlank').onclick=()=>attempt(()=>{let n=Math.floor(Number($('blankCount').value));if(n<1||n>100)throw Error('จำนวน 1–100 แผ่น');OMRPrint.print(S.exam,Array.from({length:n},()=>null));ExamUI.toast('เปิดหน้าพิมพ์ '+n+' แผ่นแล้ว','info')});
-$('scanStart').onclick=()=>attempt(startCamera);
-$('scanStop').onclick=stopCamera;
+$('printNamed').onclick=()=>attempt(()=>{if(!S.students.length)throw Error('ไม่พบรายชื่อนักเรียน');OMRPrint.print(S.exam,S.students);ExamUI.alert('เปิดหน้าพิมพ์แล้ว','กระดาษรายบุคคล '+S.students.length+' แผ่น กรุณาพิมพ์ขนาด 100%','success')});
+$('printBlank').onclick=()=>attempt(()=>{let n=Math.floor(Number($('blankCount').value));if(n<1||n>100)throw Error('จำนวน 1–100 แผ่น');OMRPrint.print(S.exam,Array.from({length:n},()=>null));ExamUI.alert('เปิดหน้าพิมพ์แล้ว','กระดาษเปล่า '+n+' แผ่น กรุณาพิมพ์ขนาด 100%','success')});
+$('scanStart').onclick=()=>attempt(async()=>{if(!await ExamUI.confirm('เริ่มตรวจด้วยกล้อง','ระบบจะอ่าน QR/รหัสนักเรียนและช่องคำตอบในครั้งเดียว กรุณาตรวจเฉลยให้ถูกต้องก่อนเริ่ม','เปิดกล้อง'))return;await startCamera()});
+$('scanStop').onclick=()=>{stopCamera();ExamUI.toast('ปิดกล้องแล้ว','info')};
 $('snap').onclick=()=>attempt(scanFrame);
 $('reportButton').onclick=()=>attempt(showReport);
+$('repairPartials').onclick=()=>attempt(async()=>{
+ if(!S.exam)throw Error('กรุณาเลือกชุดข้อสอบก่อน');
+ if(!await ExamUI.confirm('ตรวจสอบข้อมูลที่ค้าง PARTIAL','ระบบจะตรวจเฉพาะผลเก่าที่มีคำตอบครบทั้งแผ่นและไม่ว่างทั้งหมด รายการที่ข้อมูลไม่ครบจะไม่แตะต้อง และต้องสแกนใหม่','ตรวจสอบและซ่อม'))return;
+ ExamUI.busy('กำลังตรวจสอบข้อมูลค้าง...');let res;try{res=await api('repairPartials',{examId:S.exam.examId,confirm:true})}finally{ExamUI.close()}
+ const review=res.review.map(x=>x.studentId).join(', ');
+ await ExamUI.alert('ตรวจสอบข้อมูลค้างเรียบร้อย',`ซ่อมสำเร็จ ${res.repaired.length} คน • ต้องสแกนใหม่ ${res.review.length} คน${review?'\nรหัส: '+review:''}`,res.review.length?'warning':'success');
+ await showReport();
+});
 $('reportRoom').onchange=()=>attempt(showReport);
 $('finalize').onclick=()=>attempt(async()=>{
  if(!await ExamUI.confirm('เก็บผลวิเคราะห์ย้อนหลัง','บันทึกผลวิเคราะห์รวมทุกห้อง ณ ขณะนี้เป็นรายงานย้อนหลัง?','บันทึกรายงาน'))return;
