@@ -1,6 +1,7 @@
 'use strict';
 let omrLoopId=null,omrCandidate='',omrRepeat=0,omrMissing=0;
 let omrResultOpen=false,omrAwaitRemoval=false,omrOverlayId=null,omrSavedThisSession=0;
+let omrTorchTrack=null,omrTorchOn=false;
 function scanState(s){const el=document.getElementById('scanRunState');if(el)el.textContent=s;}
 function scanStatus(result){
  $('scanExamLabel').textContent=`${S.exam.subjectName} • ${S.exam.examType}`;
@@ -31,6 +32,20 @@ function showScanConfirmation(r){
 }
 function resetResultOverlayTimer(){if(omrOverlayId)clearTimeout(omrOverlayId);omrOverlayId=setTimeout(()=>{$('scanOverlay').classList.add('hidden');omrOverlayId=null;},3000);}
 
+// Torch support varies by device, browser and camera. Never assume iOS supports torch.
+function updateTorchUi(note){
+ const b=document.getElementById('scanTorch'),n=document.getElementById('torchNote');
+ if(!b)return;
+ const supported=!!(omrTorchTrack?.getCapabilities?.().torch);
+ b.disabled=!supported;b.textContent=supported?(omrTorchOn?'ไฟแฟลช: เปิดอยู่':'ไฟแฟลช: ปิดอยู่'):'ไฟแฟลช: ไม่รองรับ';
+ b.setAttribute('aria-pressed',String(omrTorchOn));
+ if(n)n.textContent=note||(supported?'ใช้ไฟแฟลชเมื่อแสงไม่พอ; ระวังแสงสะท้อนบนกระดาษ':'มือถือ/เบราว์เซอร์นี้ไม่เปิดไฟแฟลชผ่านเว็บได้');
+}
+async function toggleOmrTorch(){
+ const track=omrTorchTrack;if(!track?.getCapabilities?.().torch)return updateTorchUi();
+ try{await track.applyConstraints({advanced:[{torch:!omrTorchOn}]});omrTorchOn=!omrTorchOn;updateTorchUi()}
+ catch(e){omrTorchOn=false;updateTorchUi('ไม่สามารถเปิดไฟแฟลชได้: '+e.message);ExamUI?.toast?.('อุปกรณ์นี้ไม่อนุญาตเปิดไฟแฟลชผ่านเว็บ','warning')}
+}
 async function startCamera(){
  if(!S.exam)throw Error('กรุณาเลือกข้อสอบ');
  // ป้องกัน GitHub V4.4 คุยกับ Apps Script รุ่น 50 ข้อ/แผ่นซึ่งจะบันทึก PARTIAL
@@ -43,10 +58,10 @@ async function startCamera(){
  if(!navigator.mediaDevices?.getUserMedia)throw Error('เบราว์เซอร์หรือ HTTPS ไม่รองรับกล้อง');
  if(!window.cv?.Mat||!window.jsQR)throw Error('OpenCV.js / jsQR ยังโหลดไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง');
  stopCamera();S.stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1600},height:{ideal:1200}}});
- $('video').srcObject=S.stream;await $('video').play();$('scanner').classList.remove('hidden');S.lastPaper='';omrCandidate='';omrRepeat=0;omrSavedThisSession=0;omrAwaitRemoval=false;omrResultOpen=false;scanStatus();scanState('พร้อมสแกน');message('เปิดกล้องแล้ว วางกระดาษให้อยู่ในภาพทั้งแผ่น');ExamUI.toast('เปิดกล้องแล้ว พร้อมสแกน','info');
+ omrTorchTrack=S.stream.getVideoTracks()[0]||null;omrTorchOn=false;updateTorchUi();$('video').srcObject=S.stream;await $('video').play();$('scanner').classList.remove('hidden');S.lastPaper='';omrCandidate='';omrRepeat=0;omrSavedThisSession=0;omrAwaitRemoval=false;omrResultOpen=false;scanStatus();scanState('พร้อมสแกน');message('เปิดกล้องแล้ว วางกระดาษให้อยู่ในภาพทั้งแผ่น');ExamUI.toast('เปิดกล้องแล้ว พร้อมสแกน','info');
  const loop=async()=>{if(!S.stream)return;if($('auto').checked&&!S.processing){try{await scanFrame()}catch(e){message(e.message||String(e),true)}}if(S.stream)omrLoopId=setTimeout(loop,1100)};loop();
 }
-function stopCamera(){resetResultOverlay();omrResultOpen=false;omrAwaitRemoval=false;omrCandidate='';omrRepeat=0;if(omrLoopId)clearTimeout(omrLoopId);omrLoopId=null;if(S.stream)S.stream.getTracks().forEach(t=>t.stop());S.stream=null;$('scanner').classList.add('hidden')}
+function stopCamera(){omrTorchTrack=null;omrTorchOn=false;updateTorchUi('ปิดกล้องแล้ว');resetResultOverlay();omrResultOpen=false;omrAwaitRemoval=false;omrCandidate='';omrRepeat=0;if(omrLoopId)clearTimeout(omrLoopId);omrLoopId=null;if(S.stream)S.stream.getTracks().forEach(t=>t.stop());S.stream=null;$('scanner').classList.add('hidden')}
 function omrReadFrame(canvas,exam){
  const cv=window.cv;
  let original=null,gray=null,binary=null,contours=null,hierarchy=null,warped=null,warpedGray=null,src=null,dst=null,M=null;
@@ -92,9 +107,13 @@ function omrReadFrame(canvas,exam){
   const layout=OMRLayout.forCount(pageCount);
   for(let q=0;q<pageCount;q++){ 
     const ratios=choice.map((_,j)=>{const pt=layout.position(q,j);return darkRatio(pt.x,pt.y,layout.radius*0.53)});
-    const marked=ratios.map((v,i)=>({v,i})).filter(x=>x.v>.30).sort((a,b)=>b.v-a.v);
-    if(marked.length===1)answers.push(choice[marked[0].i]);
-    else if(marked.length===0 && Math.max(...ratios)<.13)answers.push('');
+    // Less strict than the old 0.30 fill cutoff, but require a clear winner.
+    // This avoids silently treating two genuinely dark bubbles as one answer.
+    const ranked=ratios.map((v,i)=>({v,i})).sort((a,b)=>b.v-a.v);
+    const top=ranked[0],next=ranked[1]||{v:0};
+    const clear=top.v>=0.22 && (top.v-next.v)>=0.10 && (next.v===0||top.v/next.v>=1.32);
+    if(clear)answers.push(choice[top.i]);
+    else if(top.v<0.13)answers.push('');
     else{answers.push('');uncertain.push(q+1)}
   }
   // numeric ID grid (5 digits, optional redundancy for named and blank papers)
@@ -165,3 +184,6 @@ function showSaved(r,{replacement=false}={}){
  message(`บันทึกแผ่น ${r.pageNo}/${r.totalPages} ของ ${r.student.name} ${r.complete?'รวม '+r.score+'/'+r.fullScore:'รอแผ่นถัดไป'} กรุณายกกระดาษออกก่อนสแกนแผ่นใหม่`);
  try{if(window.speechSynthesis){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(r.complete?'ตรวจครบแล้ว '+r.score+' คะแนน':'บันทึกแผ่นที่ '+r.pageNo+' แล้ว');u.lang='th-TH';u.rate=1.1;window.speechSynthesis.speak(u)}}catch(_){}
 }
+
+// Wire optional torch button; no-op on unsupported devices.
+if(document.getElementById('scanTorch')){document.getElementById('scanTorch').addEventListener('click',()=>toggleOmrTorch());updateTorchUi('เปิดกล้องเพื่อตรวจสอบไฟแฟลช');}
