@@ -139,7 +139,12 @@ $('printBlank').onclick=()=>attempt(()=>{let n=Math.floor(Number($('blankCount')
 $('scanStart').onclick=()=>attempt(async()=>{if(!await ExamUI.confirm('เริ่มตรวจด้วยกล้อง','ระบบจะอ่าน QR/รหัสนักเรียนและช่องคำตอบในครั้งเดียว กรุณาตรวจเฉลยให้ถูกต้องก่อนเริ่ม','เปิดกล้อง'))return;await startCamera()});
 $('scanStop').onclick=()=>{stopCamera();ExamUI.toast('ปิดกล้องแล้ว','info')};
 $('snap').onclick=()=>attempt(scanFrame);
-$('reportButton').onclick=()=>attempt(showReport);
+$('reportButton').onclick=()=>attempt(async()=>{
+ if(!S.exam)throw Error('กรุณาเลือกชุดข้อสอบก่อน');
+ const button=$('reportButton');button.disabled=true;ExamUI.busy('กำลังโหลดคะแนนและคำนวณผลวิเคราะห์...');
+ try{const result=await showReport();ExamUI.close();await ExamUI.alert('โหลดรายงานเรียบร้อย',`พบผลตรวจ ${result.scanned}/${result.total} คน${result.analysis?' • พร้อมดูผลวิเคราะห์แบบ V3':' • ยังไม่สามารถวิเคราะห์ได้'}`,result.analysis?'success':'warning');}
+ finally{ExamUI.close();button.disabled=false;}
+});
 $('repairPartials').onclick=()=>attempt(async()=>{
  if(!S.exam)throw Error('กรุณาเลือกชุดข้อสอบก่อน');
  if(!await ExamUI.confirm('ตรวจสอบข้อมูลที่ค้าง PARTIAL','ระบบจะตรวจเฉพาะผลเก่าที่มีคำตอบครบทั้งแผ่นและไม่ว่างทั้งหมด รายการที่ข้อมูลไม่ครบจะไม่แตะต้อง และต้องสแกนใหม่','ตรวจสอบและซ่อม'))return;
@@ -148,42 +153,74 @@ $('repairPartials').onclick=()=>attempt(async()=>{
  await ExamUI.alert('ตรวจสอบข้อมูลค้างเรียบร้อย',`ซ่อมสำเร็จ ${res.repaired.length} คน • ต้องสแกนใหม่ ${res.review.length} คน${review?'\nรหัส: '+review:''}`,res.review.length?'warning':'success');
  await showReport();
 });
-$('reportRoom').onchange=()=>attempt(showReport);
+$('reportRoom').onchange=()=>attempt(async()=>{ExamUI.busy('กำลังเปลี่ยนห้องและคำนวณผล...');try{await showReport();}finally{ExamUI.close();}});
 $('finalize').onclick=()=>attempt(async()=>{
  if(!await ExamUI.confirm('เก็บผลวิเคราะห์ย้อนหลัง','บันทึกผลวิเคราะห์รวมทุกห้อง ณ ขณะนี้เป็นรายงานย้อนหลัง?','บันทึกรายงาน'))return;
  ExamUI.busy('กำลังเก็บรายงานย้อนหลัง...');let r;try{r=await api('finalize',{examId:S.exam.examId})}finally{ExamUI.close()}
- ExamUI.toast(r.alreadySaved?'มีรายงานนี้แล้ว':'เก็บผลวิเคราะห์สำเร็จ');message('เก็บรายงานย้อนหลังแล้ว รหัส '+r.analysisId+(r.alreadySaved?' (เคยบันทึกแล้ว)':''));
+ await ExamUI.alert(r.alreadySaved?'มีรายงานนี้อยู่แล้ว':'เก็บผลวิเคราะห์สำเร็จ','รหัสรายงาน: '+r.analysisId+(r.alreadySaved?' (เคยบันทึกแล้ว)':''),'success');message('เก็บรายงานย้อนหลังแล้ว รหัส '+r.analysisId+(r.alreadySaved?' (เคยบันทึกแล้ว)':''));
  await openExam(S.exam.examId);
 });
+// V4.12 — use the same analyzeTestData result model as V3, without archiving until teacher requests it.
+function omrV3AnalysisHTML(an,exam,scanned){
+ if(!an)return `<div class="omr-analysis-empty"><h3>ยังไม่มีผลวิเคราะห์</h3><p>พบผลตรวจที่สมบูรณ์ 0 คน กรุณาตรวจว่าชีท OMR_Responses มีสถานะ OK และอัปเดต Apps Script V4.11 แล้ว</p></div>`;
+ const q=an.qualitySummary||{}, ss=an.scoreSummary||{};
+ const choices=Array.from(new Set((an.analysis||[]).flatMap(it=>[...Object.keys(it.choices||{}),...Object.keys(it.choiceDetail||{}),it.correctChoice].filter(Boolean))));
+ const preferred=[...String(exam.choiceSet||'กขคง')];choices.sort((a,b)=>{const i=preferred.indexOf(a),j=preferred.indexOf(b);return (i<0?99:i)-(j<0?99:j)||String(a).localeCompare(String(b),'th')});
+ const val=x=>x===undefined||x===null||x===''?'—':esc(x);
+ const labels=[['KR-20',`${val(an.kr20)}${q.kr20Level?' ('+val(q.kr20Level)+')':''}`],['ข้อใช้ได้ดี',val(q.goodItems)],['ควรปรับปรุง',val(q.improveItems)],['ใช้งานไม่ได้',val(q.badItems)],['คะแนนเฉลี่ย',`${val(ss.mean)} / ${val(ss.fullScore||exam.numQuestions)}`]];
+ const cards=labels.map(([label,value],i)=>`<div class="omr-v3-card c${i}"><strong>${value}</strong><span>${label}</span></div>`).join('');
+ const rows=(an.analysis||[]).map(it=>{
+  const cls=it.interpretation==='ใช้ได้ดี'?'omr-v3-good':it.interpretation==='ควรปรับปรุง'?'omr-v3-warn':'omr-v3-bad';
+  const cells=choices.map(c=>{const d=(it.choiceDetail||{})[c]||{},label=(it.choiceAnalysis||{})[c]||'',corr=c===it.correctChoice;
+    return `<td><b class="${corr?'omr-v3-correct':''}">${val(d.count??(it.choices||{})[c]??0)} คน (${val(d.percent??0)}%)</b><small>สูง ${val(d.high)} / ต่ำ ${val(d.low)}</small><small>${val(label)}</small></td>`;
+  }).join('');
+  return `<tr class="${cls}"><td><b>${val(it.item)}</b></td><td><b>${val(it.correctChoice)}</b></td>${cells}<td>${val(it.p)}<small>${val(it.difficultyLevel)}</small></td><td>${val(it.r)}<small>${val(it.discriminationLevel)}</small></td><td><b>${val(it.interpretation)}</b><small>${val(it.reason)}</small></td></tr>`;
+ }).join('');
+ const counts=new Map();(ss.individualScores||[]).forEach(n=>counts.set(Number(n),(counts.get(Number(n))||0)+1));
+ const maximum=Math.max(1,...counts.values());const scoreMax=Number(ss.fullScore||exam.numQuestions)||20;
+ const bars=Array.from({length:scoreMax+1},(_,i)=>`<div class="omr-histo-col"><div class="omr-histo-bar" style="height:${Math.max(1,Math.round((counts.get(i)||0)/maximum*100))}%" title="${i} คะแนน: ${counts.get(i)||0} คน"></div><small>${i}</small></div>`).join('');
+ return `<section class="omr-v3-report" id="omrV3Analysis">
+ <div class="omr-v3-header"><h3>ผลการวิเคราะห์ข้อสอบ</h3><p>วิชา ${val(exam.subjectName)} (${val(exam.subjectCode)}) • ${val(exam.semester)}/${val(exam.academicYear)} • วิเคราะห์จากผู้ตรวจสำเร็จ ${scanned} คน</p></div>
+ <div class="omr-v3-summary">${cards}</div>
+ <p class="omr-v3-hint"><b>ความเชื่อมั่น:</b> ${val(q.kr20Text)} &nbsp;|&nbsp; กลุ่มสูงและต่ำประมาณ ${val(q.groupPercentage??27)}% กลุ่มละ ${val(q.groupSize)} คน</p>
+ <div class="omr-v3-table-wrap"><table class="omr-v3-table"><thead><tr><th>ข้อ</th><th>เฉลย</th>${choices.map(c=>`<th>${esc(c)}</th>`).join('')}<th>P</th><th>R</th><th>สรุป</th></tr></thead><tbody>${rows}</tbody></table></div>
+ <div class="omr-v3-bottom"><table class="omr-v3-stats"><thead><tr><th colspan="2">สถิติคะแนน</th></tr></thead><tbody><tr><td>คะแนนเต็ม</td><td>${val(ss.fullScore||exam.numQuestions)}</td></tr><tr><td>ค่าเฉลี่ย</td><td>${val(ss.mean)}</td></tr><tr><td>S.D.</td><td>${val(ss.sd)}</td></tr><tr><td>สูงสุด</td><td>${val(ss.maxScore)}</td></tr><tr><td>ต่ำสุด</td><td>${val(ss.minScore)}</td></tr></tbody></table><div class="omr-histo"><b>การแจกแจงคะแนน</b><div class="omr-histo-chart">${bars}</div></div></div>
+ </section>`;
+}
+function omrPrintFullReport(r){
+ const w=window.open('','_blank');if(!w)throw Error('กรุณาอนุญาต Pop-up ของเว็บไซต์ก่อน');
+ const school=esc(S.exam.subjectName),total=S.exam.numQuestions;
+ const scoreRows=r.students.map(st=>`<tr><td>${esc(st.studentId)}</td><td>${esc(st.name)}</td><td>${esc(st.room)}</td><td>${st.score===null?'—':st.score}</td><td>${total}</td><td>${st.score===null?'—':(st.score/total*100).toFixed(2)}</td></tr>`).join('');
+ const summary=`<h2>โรงเรียนบางไทรวิทยา</h2><p class="center">${esc(S.exam.examType)} • ${school} (${esc(S.exam.subjectCode)}) • ${esc(S.exam.semester)}/${esc(S.exam.academicYear)} • ${esc($('reportRoom').value||'รวมทุกห้อง')}</p><p class="center">ตรวจแล้ว ${r.scanned} / ${r.total} คน</p>`;
+ const analysisHTML=omrV3AnalysisHTML(r.analysis,S.exam,r.scanned);
+ const scoreHTML=`<div class="scores-print"><h3>คะแนนรายบุคคล</h3><table><thead><tr><th>รหัสนักเรียน</th><th>ชื่อ–นามสกุล</th><th>ชั้น</th><th>คะแนน</th><th>เต็ม</th><th>ร้อยละ</th></tr></thead><tbody>${scoreRows}</tbody></table></div>`;
+ const stylesheet=Array.from(document.styleSheets).find(x=>x.href?.includes('style.css'));
+ const css=String.raw`@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');
+ @page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}body{font-family:Sarabun, sans-serif;color:#172b4d;font-size:9pt;margin:0}h2,.center{text-align:center;margin:4px 0}h3{margin:6px 0}table{width:100%;border-collapse:collapse}th,td{border:1px solid #cbd5e1;padding:4px;font-size:8pt;vertical-align:top}th{background:#f1f5f9}tr{break-inside:avoid}.omr-v3-header h3{font-size:14pt}.omr-v3-summary{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:9px 0}.omr-v3-card{border:1px solid #dce2e9;padding:7px;text-align:center}.omr-v3-card strong{display:block;font-size:14pt}.omr-v3-card span{font-size:8pt}.omr-v3-hint{font-size:8pt;background:#eef4ff;padding:6px}.omr-v3-table-wrap{overflow:visible}.omr-v3-table{table-layout:fixed}.omr-v3-table th,.omr-v3-table td{font-size:7pt;text-align:center;padding:3px 2px;overflow-wrap:anywhere}.omr-v3-table small{display:block;font-size:6pt;line-height:1.35}.omr-v3-correct{color:#166534}.omr-v3-good{background:#f0fdf4}.omr-v3-warn{background:#fffbeb}.omr-v3-bad{background:#fef2f2}.omr-v3-bottom{display:flex;gap:20px;margin-top:12px;align-items:flex-start}.omr-v3-stats{width:240px}.omr-histo{flex:1}.omr-histo-chart{display:flex;align-items:flex-end;gap:2px;height:120px;border-bottom:1px solid #94a3b8}.omr-histo-col{height:100%;flex:1;display:flex;align-items:center;justify-content:flex-end;flex-direction:column;min-width:4px}.omr-histo-bar{width:85%;background:#7da4ec;min-height:1px}.omr-histo-col small{font-size:6pt}.scores-print{break-before:page}.scores-print td{font-size:8pt}`;
+ w.document.open();w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>วิเคราะห์ข้อสอบ ${school}</title><style>${css}</style></head><body>${summary}${analysisHTML}${scoreHTML}</body></html>`);w.document.close();
+ Promise.resolve(w.document.fonts?.ready).then(()=>{w.focus();w.print()});
+}
 async function showReport(){
-  const r=await api('report',{examId:S.exam.examId,room:$('reportRoom').value});if(!$('reportRoom').value)S.exam.scanned=r.scanned;
-  const rows=r.students.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.studentId)}</td><td>${esc(s.name)}</td><td>${esc(s.room)}</td><td>${s.score===null?'—':s.score+' / '+S.exam.numQuestions}</td><td>${s.status==='OK'?'ครบแล้ว':s.status==='PARTIAL'?'ยังไม่ครบ (แผ่น '+s.pagesDone.join(', ')+')':'รอตรวจ'}</td></tr>`).join('');
-  const analysis=r.analysis;
-  let a='';if(analysis){a=`<h3>วิเคราะห์อัตโนมัติ (${r.scanned} คนที่ตรวจครบทุกแผ่น)</h3><p class="sub">คำนวณจากคำตอบที่สแกนแล้ว ไม่ต้องกรอกข้อมูลซ้ำ • ข้อมูลนี้จะเปลี่ยนตามผลตรวจล่าสุด</p><p>เฉลี่ย ${esc(analysis.scoreSummary.mean)} | S.D. ${esc(analysis.scoreSummary.sd)} | KR-20 ${esc(analysis.kr20)} | ข้อที่ใช้ได้ดี ${analysis.qualitySummary.goodItems}</p><div class="scroll"><table><tr><th>ข้อ</th><th>เฉลย</th><th>p</th><th>r</th><th>ผล</th></tr>${analysis.analysis.map(v=>`<tr><td>${v.item}</td><td>${esc(v.correctChoice)}</td><td>${v.p}</td><td>${v.r}</td><td>${esc(v.interpretation)}</td></tr>`).join('')}</table></div>`;}
-  $('report').innerHTML=`<h3>รายงานคะแนน ${esc(S.exam.examType)} • ${esc(S.exam.subjectName)}</h3><p>ตรวจครบ ${r.scanned}/${r.total} คน • รออีกแผ่น ${r.partial} คน • จำนวนข้อ ${S.exam.numQuestions}</p><div class="row"><button id="xlsxDownload">ดาวน์โหลดคะแนน Excel (.xlsx)</button><button id="reportPrint" class="secondary">พิมพ์รายงานวิเคราะห์ PDF</button></div><table><tr><th>ที่</th><th>รหัส</th><th>ชื่อ</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th></tr>${rows}</table>${a}`;
-  $('xlsxDownload').onclick=()=>{
-    if(!window.XLSX)throw Error('ยังโหลดไลบรารี Excel ไม่สำเร็จ');
-    const wb=XLSX.utils.book_new();const heads=['เลขประจำตัว','ชื่อ–นามสกุล','ชั้น','คะแนน','เต็ม','ร้อยละ','สถานะ'];
-    const add=(rows,name)=>{
-      const table=[heads,...rows.map(s=>[String(s.studentId),s.name,s.room,s.score??'',S.exam.numQuestions,s.score===null?'':Math.round(s.score/S.exam.numQuestions*10000)/100,s.status==='OK'?'ตรวจแล้ว':'ยังไม่ตรวจ'])];
-      const ws=XLSX.utils.aoa_to_sheet(table);
-      for(let i=1;i<table.length;i++){const addr=XLSX.utils.encode_cell({r:i,c:0});ws[addr].t='s';ws[addr].v=String(table[i][0]);}
-      ws['!cols']=[{wch:18},{wch:35},{wch:14},{wch:12},{wch:10},{wch:12},{wch:16}];
-      XLSX.utils.book_append_sheet(wb,ws,name.substring(0,31));
-    };
-    add(r.students,'คะแนนรวม');
-    if(!$('reportRoom').value){[...new Set(r.students.map(s=>s.room))].forEach((room,i)=>add(r.students.filter(s=>s.room===room),('ห้อง '+room).replace(/[\/?*\[\]:]/g,'-')+' '+(i+1)));}
-    XLSX.writeFile(wb,'คะแนน-'+S.exam.subjectCode+'-'+S.exam.examType+'.xlsx');ExamUI.toast('ดาวน์โหลด Excel สำเร็จ');
-  };
-  $('reportPrint').onclick=()=>{
-    const w=window.open('','_blank');if(!w)throw Error('กรุณาอนุญาต Pop-up');
-    const h=esc;const an=r.analysis;
-    const itemRows=an?an.analysis.map(v=>`<tr><td>${v.item}</td><td>${h(v.correctChoice)}</td><td>${v.p}</td><td>${v.r}</td><td>${h(v.difficultyLevel)}</td><td>${h(v.discriminationLevel)}</td><td>${h(v.interpretation)}</td><td>${h(v.reason)}</td></tr>`).join(''):'';
-    const analysisSection=an?`<h2>รายงานวิเคราะห์คุณภาพข้อสอบ</h2><p>ค่าเฉลี่ย ${h(an.scoreSummary.mean)} • S.D. ${h(an.scoreSummary.sd)} • KR-20 ${h(an.kr20)} • ใช้ได้ดี ${an.qualitySummary.goodItems} ข้อ</p><table><thead><tr><th>ข้อ</th><th>เฉลย</th><th>p</th><th>r</th><th>ระดับความยาก</th><th>อำนาจจำแนก</th><th>คุณภาพ</th><th>เหตุผล</th></tr></thead><tbody>${itemRows}</tbody></table>`:'<p>ยังไม่มีผู้เข้าสอบที่ตรวจเสร็จ</p>';
-    const body=`<h1>โรงเรียนบางไทรวิทยา</h1><h2>รายงานผลการตรวจข้อสอบปรนัย</h2><p>รายวิชา ${h(S.exam.subjectName)} (${h(S.exam.subjectCode)}) • ${h(S.exam.examType)} • ${h(S.exam.semester)}/${h(S.exam.academicYear)} • ห้อง ${h($('reportRoom').value||'รวมทุกห้อง')}</p><p>ตรวจแล้ว ${r.scanned} / ${r.total} คน</p><table><thead><tr><th>รหัสนักเรียน</th><th>ชื่อ–นามสกุล</th><th>ชั้น</th><th>คะแนน</th><th>เต็ม</th><th>ร้อยละ</th></tr></thead><tbody>${r.students.map(st=>`<tr><td>${h(st.studentId)}</td><td>${h(st.name)}</td><td>${h(st.room)}</td><td>${st.score===null?'—':st.score}</td><td>${S.exam.numQuestions}</td><td>${st.score===null?'—':(st.score/S.exam.numQuestions*100).toFixed(2)}</td></tr>`).join('')}</tbody></table><div class="newpage">${analysisSection}</div>`;
-    w.document.open();w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>รายงานผลการตรวจและวิเคราะห์ข้อสอบ</title><style>@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');@page{size:A4 portrait;margin:12mm}body{font-family:Sarabun,sans-serif;color:#172b4d}h1{font-size:15pt;text-align:center;margin:0}h2{font-size:13pt;text-align:center}p{font-size:10pt}table{width:100%;border-collapse:collapse}td,th{font-size:8pt;padding:4px;border:1px solid #aaa;word-wrap:break-word}th{background:#fff;font-weight:bold}tr{break-inside:avoid}.newpage{break-before:page}</style></head><body>${body}</body></html>`);w.document.close();Promise.resolve(w.document.fonts?.ready).then(()=>{w.focus();w.print()});
-  };
-  message(`แสดงรายงาน ${r.scanned}/${r.total} คน`);ExamUI.toast('โหลดคะแนนและผลวิเคราะห์แล้ว','info');
+ if(!S.exam)throw Error('กรุณาเลือกชุดข้อสอบก่อน');
+ const r=await api('report',{examId:S.exam.examId,room:$('reportRoom').value});if(!$('reportRoom').value)S.exam.scanned=r.scanned;
+ const rows=r.students.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.studentId)}</td><td>${esc(s.name)}</td><td>${esc(s.room)}</td><td>${s.score===null?'—':s.score+' / '+S.exam.numQuestions}</td><td>${s.status==='OK'?'ครบแล้ว':s.status==='PARTIAL'?'ยังไม่ครบ (แผ่น '+s.pagesDone.join(', ')+')':'รอตรวจ'}</td></tr>`).join('');
+ const analysisHTML=omrV3AnalysisHTML(r.analysis,S.exam,r.scanned);
+ $('report').innerHTML=`<h3>รายงานคะแนน ${esc(S.exam.examType)} • ${esc(S.exam.subjectName)}</h3><p>ตรวจครบ ${r.scanned}/${r.total} คน • รออีกแผ่น ${r.partial} คน • จำนวนข้อ ${S.exam.numQuestions}</p><div class="row omr-v3-actions"><button id="xlsxDownload">ดาวน์โหลดคะแนน Excel (.xlsx)</button><button id="reportPrint" class="secondary">พิมพ์รายงานวิเคราะห์แบบ V3 (PDF)</button><button id="jumpToScores" class="secondary">ดูคะแนนรายบุคคล</button></div>${analysisHTML}<section class="omr-v3-individual" id="omrScores"><h3>คะแนนรายบุคคล</h3><div class="scroll"><table><thead><tr><th>ที่</th><th>รหัส</th><th>ชื่อ</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+ $('jumpToScores').onclick=()=>document.getElementById('omrScores')?.scrollIntoView({behavior:'smooth',block:'start'});
+ $('xlsxDownload').onclick=()=>attempt(async()=>{
+  if(!window.XLSX)throw Error('ยังโหลดไลบรารี Excel ไม่สำเร็จ');
+  if(!await ExamUI.confirm('ดาวน์โหลดคะแนน Excel',`ส่งออก ${r.total} รายชื่อ • ตรวจแล้ว ${r.scanned} คน โดยไม่ใส่ 0 แทนผู้ที่ยังไม่ตรวจ`,'ดาวน์โหลด Excel'))return;
+  const wb=XLSX.utils.book_new();const heads=['เลขประจำตัว','ชื่อ–นามสกุล','ชั้น','คะแนน','เต็ม','ร้อยละ','สถานะ'];
+  const add=(students,name)=>{const table=[heads,...students.map(st=>[String(st.studentId),st.name,st.room,st.score??'',S.exam.numQuestions,st.score===null?'':Math.round(st.score/S.exam.numQuestions*10000)/100,st.status==='OK'?'ตรวจแล้ว':st.status==='PARTIAL'?'รอตรวจครบ':'ยังไม่ตรวจ'])];const ws=XLSX.utils.aoa_to_sheet(table);for(let i=1;i<table.length;i++){const addr=XLSX.utils.encode_cell({r:i,c:0});ws[addr].t='s';ws[addr].v=String(table[i][0]);}ws['!cols']=[{wch:18},{wch:35},{wch:14},{wch:12},{wch:10},{wch:12},{wch:16}];XLSX.utils.book_append_sheet(wb,ws,name.substring(0,31));};
+  add(r.students,'คะแนนรวม');if(!$('reportRoom').value)[...new Set(r.students.map(st=>st.room))].forEach((room,i)=>add(r.students.filter(st=>st.room===room),('ห้อง '+room).replace(/[\/?*\[\]:]/g,'-')+' '+(i+1)));
+  XLSX.writeFile(wb,'คะแนน-'+S.exam.subjectCode+'-'+S.exam.examType+'.xlsx');await ExamUI.alert('ส่งออกคะแนนเรียบร้อย',`ดาวน์โหลดข้อมูล ${r.total} คน โดยมีคะแนน ${r.scanned} คน`,'success');
+ });
+ $('reportPrint').onclick=()=>attempt(async()=>{
+  if(!await ExamUI.confirm('พิมพ์รายงานวิเคราะห์แบบ V3',`พิมพ์ผลวิเคราะห์ ${r.scanned} คน และคะแนนรายบุคคล ${r.total} คน`,'เปิดรายงาน PDF'))return;
+  omrPrintFullReport(r);ExamUI.toast('เปิดหน้าพิมพ์รายงานแล้ว','success');
+ });
+ message(`แสดงรายงาน ${r.scanned}/${r.total} คน`);
+ return r;
 }
 
 async function compressEssayPhoto(file){
