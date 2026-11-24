@@ -66,7 +66,7 @@ async function startCamera(){
  const loop=async()=>{if(!S.stream)return;if($('auto').checked&&!S.processing&&!omrResultOpen&&!omrReviewPending){try{await scanFrame()}catch(e){message(e.message||String(e),true)}}if(S.stream)omrLoopId=setTimeout(loop,550)};loop();
 }
 function stopCamera(){omrTorchTrack=null;omrTorchOn=false;updateTorchUi('ปิดกล้องแล้ว');resetResultOverlay();omrResultOpen=false;omrAwaitRemoval=false;omrReviewPending=false;omrCandidate='';omrRepeat=0;if(omrLoopId)clearTimeout(omrLoopId);omrLoopId=null;if(S.stream)S.stream.getTracks().forEach(t=>t.stop());S.stream=null;$('scanner').classList.add('hidden')}
-function omrReadFrame(canvas,exam){
+function omrReadFrame(canvas,exam,manualCorners=null){
  const cv=window.cv;
  let original=null,gray=null,binary=null,contours=null,hierarchy=null,warped=null,warpedGray=null,warpedAdaptive=null,qrCrop=null,src=null,dst=null,M=null;
  try{
@@ -81,17 +81,23 @@ function omrReadFrame(canvas,exam){
    }
    c.delete();
   }
-  if(candidates.length<4)return null;
+  if(candidates.length<4 && !manualCorners)return null;
   // วงทึบมุมกระดาษเป็นสี่เหลี่ยมพื้นที่ใกล้เคียงกัน และอยู่ห่างกันมาก
   const W=gray.cols,H=gray.rows;
   const pick=(score)=>candidates.slice().sort((a,b)=>score(a)-score(b))[0];
   const tl=pick(p=>p.x+p.y),tr=pick(p=>W-p.x+p.y),bl=pick(p=>p.x+H-p.y),br=pick(p=>W-p.x+H-p.y);
-  if(new Set([tl,tr,bl,br]).size!==4)return null;
-  const xdist=Math.hypot(tr.x-tl.x,tr.y-tl.y),ydist=Math.hypot(bl.x-tl.x,bl.y-tl.y);
-  if(xdist<W*.22||ydist<H*.25)return null;
-  const areas=[tl,tr,bl,br].map(p=>p.area);if(Math.max(...areas)/Math.min(...areas)>3.5)return null;
+  if(!manualCorners){
+   if(new Set([tl,tr,bl,br]).size!==4)return null;
+   const xdist=Math.hypot(tr.x-tl.x,tr.y-tl.y),ydist=Math.hypot(bl.x-tl.x,bl.y-tl.y);
+   if(xdist<W*.22||ydist<H*.25)return null;
+   const areas=[tl,tr,bl,br].map(p=>p.area);if(Math.max(...areas)/Math.min(...areas)>3.5)return null;
+  }
   const w=840,h=1188; // 4 px/mm, coordinate matches print.js
-  src=cv.matFromArray(4,1,cv.CV_32FC2,[tl.x,tl.y,tr.x,tr.y,br.x,br.y,bl.x,bl.y]);
+  // PDF repair: allow teacher to mark centers of all 4 registration squares manually.
+  // Coordinates are in the original rasterized PDF page pixel space.
+  const points=manualCorners ? manualCorners : [tl,tr,br,bl];
+  if(points.length!==4 || points.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)))throw Error('กรุณาระบุจุดมาร์กทั้ง 4 มุม');
+  src=cv.matFromArray(4,1,cv.CV_32FC2,points.flatMap(p=>[p.x,p.y]));
   dst=cv.matFromArray(4,1,cv.CV_32FC2,[14*4,14*4,196*4,14*4,196*4,283*4,14*4,283*4]);
   M=cv.getPerspectiveTransform(src,dst);warped=new cv.Mat();cv.warpPerspective(original,warped,M,new cv.Size(w,h),cv.INTER_LINEAR,cv.BORDER_CONSTANT,new cv.Scalar(255,255,255,255));
   warpedGray=new cv.Mat();cv.cvtColor(warped,warpedGray,cv.COLOR_RGBA2GRAY);

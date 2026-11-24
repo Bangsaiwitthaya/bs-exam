@@ -22,8 +22,9 @@ const OMRPrint=(()=>{
   const name=s.name||'..............................................';
   const blank=!s.studentId;
   const parts=[
-   txt(20,21,'โรงเรียนบางไทรวิทยา',4.9,'font-weight="700"'),
-   txt(20,27,'กระดาษคำตอบ'+subtitle+' · '+e.examType,3.6,'font-weight="700"'),
+   txt(20,16,'บริเวณเย็บมุมซ้าย • อย่าให้ลวดทับจุดดำ',2.35),
+   txt(20,22,'โรงเรียนบางไทรวิทยา',4.7,'font-weight="700"'),
+   txt(20,28,'กระดาษคำตอบ'+subtitle+' · '+e.examType,3.45,'font-weight="700"'),
    txt(20,33,`${e.subjectName} (${e.subjectCode}) · ${e.semester}/${e.academicYear}`,3.0),
    txt(20,39,`ชื่อ–สกุล ${name}`,3.25),
    txt(20,45,`ชั้น ${s.room||'......................'}`,3.2),
