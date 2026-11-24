@@ -47,11 +47,15 @@ function readExamForm(){
 function cancelEdit(){S.editExamId=null;$('createTitle').textContent='สร้างกระดาษคำตอบ';$('create').textContent='บันทึกชุดข้อสอบ';$('cancelEdit').classList.add('hidden');}
 $('cancelEdit').onclick=cancelEdit;
 $('create').onclick=()=>attempt(async()=>{
+ const button=$('create');
+ if(button.disabled)return;
  const form=readExamForm(),editing=!!S.editExamId;
  if(!form.rooms.length)throw Error('กรุณาเลือกอย่างน้อย 1 ห้องเรียน');
  if(!await ExamUI.confirm(editing?'ยืนยันแก้ไขชุดข้อสอบ':'ยืนยันสร้างชุดข้อสอบ',
   `${form.subjectName} จำนวน ${form.numQuestions} ข้อ สำหรับ ${form.rooms.length} ห้องเรียน${editing?'\n(หากเปลี่ยนจำนวนข้อหรือรูปแบบตัวเลือก เฉลยเดิมจะถูกล้าง)':''}`,
   editing?'บันทึกการแก้ไข':'สร้างชุดข้อสอบ'))return;
+ button.disabled=true;
+ try {
  const photos=[...document.querySelectorAll('.essay-upload')].map(x=>x.files[0]||null);
  ExamUI.busy(editing?'กำลังแก้ไขชุดข้อสอบ...':'กำลังสร้างชุดข้อสอบ...');
  let result;
@@ -64,6 +68,7 @@ $('create').onclick=()=>attempt(async()=>{
  cancelEdit();message(editing?'แก้ไขชุดข้อสอบสำเร็จ':'สร้างชุดข้อสอบสำเร็จ');
  await ExamUI.alert('บันทึกสำเร็จ',editing?'แก้ไขข้อมูลชุดข้อสอบเรียบร้อยแล้ว':'สร้างชุดข้อสอบเรียบร้อยแล้ว','success');
  await listExams();await openExam(result.examId,{silent:true});ExamRoute.navigate('print');
+ }finally{button.disabled=false;}
 });
 async function editExam(id){
  const e=await api('getExam',{examId:id});
