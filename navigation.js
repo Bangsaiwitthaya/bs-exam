@@ -23,6 +23,7 @@ window.ExamRoute=(()=>{
  document.getElementById('create').addEventListener('click',()=>{ /* create flow chooses print when done */ });
  document.getElementById('keyToggle').addEventListener('click',()=>document.getElementById('keySection').classList.toggle('hidden'));
  document.getElementById('downloadPng').addEventListener('click',()=>attempt(async()=>{if(!S.exam)throw Error('กรุณาเลือกชุดข้อสอบก่อน');await OMRPrint.pngBlank(S.exam);ExamUI.toast('ดาวน์โหลดรูปภาพ PNG สำเร็จ')}));
+ document.getElementById('pdfAutoRun').addEventListener('click',()=>attempt(()=>OMRBatch.processPdf(true)));
  document.getElementById('pdfRun').addEventListener('click',()=>attempt(()=>OMRBatch.processPdf()));
  return {navigate,afterLogin(){navigate(pending)},afterSelect(){switchMode(current);document.getElementById('currentPanel').scrollIntoView({behavior:'smooth'})},get current(){return current}};
 })();

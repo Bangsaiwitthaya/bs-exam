@@ -51,7 +51,7 @@ const OMRPrint=(()=>{
     for(let r=0;r<10;r++)parts.push(circ(x,idLayout.y0+r*idLayout.dy,idLayout.r,!!digits&&digits[d]===r));
   }
   for(let r=0;r<10;r++)parts.push(txt(129,48+r*idLayout.dy,r,2.9));
-  parts.push(txt(20,89.5,'ระบายคำตอบให้เต็มวงด้วยดินสอ หรือปากกาสีน้ำเงิน/ดำ',3.0),line(20,92,191,92,'.4','#333'));
+  parts.push(txt(20,89.5,'แนะนำ: ใช้ปากกาสีน้ำเงินหรือดำ ระบายวงคำตอบให้เต็มวง (ดินสออ่านยาก)',3.0),line(20,92,191,92,'.4','#333'));
   for(let col=0;col<layout.columns;col++){
     const base=layout.baseXs[col];
     parts.push(txt(base-12.0,96,'ข้อ',3.0,'font-weight="700"'));

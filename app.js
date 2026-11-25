@@ -132,17 +132,18 @@ $('saveKey').onclick=()=>attempt(async()=>{
   }
   if(!confirmRegrade && !await ExamUI.confirm('บันทึกเฉลย',`ยืนยันเฉลย ${key.length} ข้อ ก่อนเริ่มสแกนตรวจ?`,'บันทึกเฉลย'))return;
   ExamUI.busy('กำลังบันทึกเฉลย...');let r;try{r=await api('saveKey',{examId:S.exam.examId,answerKey:key,confirmRegrade})}finally{ExamUI.close()}
-  S.exam.answerKey=key;S.exam.status='READY';$('keyStatus').textContent='มีเฉลยครบ';$('keySection').classList.add('hidden');message('บันทึกเฉลยเรียบร้อย '+(r.regraded?`คำนวณใหม่ ${r.regraded} คน`:''));ExamUI.toast('บันทึกเฉลยสำเร็จ'+(r.regraded?' และคำนวณคะแนนใหม่':''));await listExams();
+  S.exam.answerKey=key;S.exam.status='READY';$('keyStatus').textContent='มีเฉลยครบ';$('keySection').classList.add('hidden');message('บันทึกเฉลยเรียบร้อย '+(r.regraded?`คำนวณใหม่ ${r.regraded} คน`:''));ExamUI.toast('บันทึกเฉลยสำเร็จ'+(r.regraded?' และคำนวณคะแนนย้อนหลังแล้ว':''));await listExams();
 });
 $('printNamed').onclick=()=>attempt(()=>{if(!S.students.length)throw Error('ไม่พบรายชื่อนักเรียน');OMRPrint.print(S.exam,S.students);ExamUI.alert('เปิดหน้าพิมพ์แล้ว','กระดาษรายบุคคล '+S.students.length+' แผ่น กรุณาพิมพ์ขนาด 100%','success')});
 $('printBlank').onclick=()=>attempt(()=>{let n=Math.floor(Number($('blankCount').value));if(n<1||n>100)throw Error('จำนวน 1–100 แผ่น');OMRPrint.print(S.exam,Array.from({length:n},()=>null));ExamUI.alert('เปิดหน้าพิมพ์แล้ว','กระดาษเปล่า '+n+' แผ่น กรุณาพิมพ์ขนาด 100%','success')});
+$('scanAutoStart').onclick=()=>attempt(async()=>{if(!await ExamUI.confirm('เปิดกล้อง QR อัตโนมัติ','สแกนกระดาษต่างวิชาสลับกันได้ และถ้ายังไม่มีเฉลยจะเก็บคำตอบไว้ก่อน','เปิดกล้อง'))return;await startCamera(true)});
 $('scanStart').onclick=()=>attempt(async()=>{if(!await ExamUI.confirm('เริ่มตรวจด้วยกล้อง','ระบบจะอ่าน QR/รหัสนักเรียนและช่องคำตอบในครั้งเดียว กรุณาตรวจเฉลยให้ถูกต้องก่อนเริ่ม','เปิดกล้อง'))return;await startCamera()});
 $('scanStop').onclick=()=>{stopCamera();ExamUI.toast('ปิดกล้องแล้ว','info')};
 $('snap').onclick=()=>attempt(scanFrame);
 $('reportButton').onclick=()=>attempt(async()=>{
  if(!S.exam)throw Error('กรุณาเลือกชุดข้อสอบก่อน');
  const button=$('reportButton');button.disabled=true;ExamUI.busy('กำลังโหลดคะแนนและคำนวณผลวิเคราะห์...');
- try{const result=await showReport();ExamUI.close();await ExamUI.alert('โหลดรายงานเรียบร้อย',`พบผลตรวจ ${result.scanned}/${result.total} คน${result.analysis?' • พร้อมดูผลวิเคราะห์แบบ V3':' • ยังไม่สามารถวิเคราะห์ได้'}`,result.analysis?'success':'warning');}
+ try{const result=await showReport();ExamUI.close();await ExamUI.alert('โหลดรายงานเรียบร้อย',`พบผลตรวจ ${result.scanned}/${result.total} คน${result.analysis?' • พร้อมดูผลวิเคราะห์แบบ V3':' • ยังไม่สามารถวิเคราะห์ได้ (ตรวจสอบสถานะรอเฉลย)'}`,result.analysis?'success':'warning');}
  finally{ExamUI.close();button.disabled=false;}
 });
 $('repairPartials').onclick=()=>attempt(async()=>{
@@ -203,9 +204,9 @@ function omrPrintFullReport(r){
 async function showReport(){
  if(!S.exam)throw Error('กรุณาเลือกชุดข้อสอบก่อน');
  const r=await api('report',{examId:S.exam.examId,room:$('reportRoom').value});if(!$('reportRoom').value)S.exam.scanned=r.scanned;
- const rows=r.students.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.studentId)}</td><td>${esc(s.name)}</td><td>${esc(s.room)}</td><td>${s.score===null?'—':s.score+' / '+S.exam.numQuestions}</td><td>${s.status==='OK'?'ครบแล้ว':s.status==='PARTIAL'?'ยังไม่ครบ (แผ่น '+s.pagesDone.join(', ')+')':'รอตรวจ'}</td></tr>`).join('');
+ const rows=r.students.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.studentId)}</td><td>${esc(s.name)}</td><td>${esc(s.room)}</td><td>${s.score===null?'—':s.score+' / '+S.exam.numQuestions}</td><td>${s.status==='OK'?'ตรวจคะแนนแล้ว':s.status==='WAIT_KEY'?'สแกนแล้ว • รอเฉลย':s.status==='PARTIAL'?'ยังไม่ครบ (แผ่น '+s.pagesDone.join(', ')+')':'รอตรวจ'}</td></tr>`).join('');
  const analysisHTML=omrV3AnalysisHTML(r.analysis,S.exam,r.scanned);
- $('report').innerHTML=`<h3>รายงานคะแนน ${esc(S.exam.examType)} • ${esc(S.exam.subjectName)}</h3><p>ตรวจครบ ${r.scanned}/${r.total} คน • รออีกแผ่น ${r.partial} คน • จำนวนข้อ ${S.exam.numQuestions}</p><div class="row omr-v3-actions"><button id="xlsxDownload">ดาวน์โหลดคะแนน Excel (.xlsx)</button><button id="reportPrint" class="secondary">พิมพ์รายงานวิเคราะห์แบบ V3 (PDF)</button><button id="jumpToScores" class="secondary">ดูคะแนนรายบุคคล</button></div>${analysisHTML}<section class="omr-v3-individual" id="omrScores"><h3>คะแนนรายบุคคล</h3><div class="scroll"><table><thead><tr><th>ที่</th><th>รหัส</th><th>ชื่อ</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+ $('report').innerHTML=`<h3>รายงานคะแนน ${esc(S.exam.examType)} • ${esc(S.exam.subjectName)}</h3><p>ตรวจครบ ${r.scanned}/${r.total} คน • รอเฉลย ${r.waitingKey||0} คน • ค้าง PARTIAL ${r.partial} คน • จำนวนข้อ ${S.exam.numQuestions}</p><div class="row omr-v3-actions"><button id="xlsxDownload">ดาวน์โหลดคะแนน Excel (.xlsx)</button><button id="reportPrint" class="secondary">พิมพ์รายงานวิเคราะห์แบบ V3 (PDF)</button><button id="jumpToScores" class="secondary">ดูคะแนนรายบุคคล</button></div>${analysisHTML}<section class="omr-v3-individual" id="omrScores"><h3>คะแนนรายบุคคล</h3><div class="scroll"><table><thead><tr><th>ที่</th><th>รหัส</th><th>ชื่อ</th><th>ชั้น</th><th>คะแนน</th><th>สถานะ</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
  $('jumpToScores').onclick=()=>document.getElementById('omrScores')?.scrollIntoView({behavior:'smooth',block:'start'});
  $('xlsxDownload').onclick=()=>attempt(async()=>{
   if(!window.XLSX)throw Error('ยังโหลดไลบรารี Excel ไม่สำเร็จ');

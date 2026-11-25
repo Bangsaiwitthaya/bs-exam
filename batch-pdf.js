@@ -15,16 +15,18 @@ window.OMRBatch=(()=>{
   host.innerHTML=issues.length?`<div class="pdf-issue-head"><strong>หน้าที่ต้องตรวจทาน ${waiting.length} / ${issues.length}</strong><small>เก็บภาพชั่วคราวเฉพาะในหน้านี้ ปิด/โหลดเว็บใหม่แล้วต้องเปิด PDF อีกครั้ง</small></div>${issues.map(x=>`<div class="pdf-issue-row"><span>หน้า ${x.page}<small>${safe(x.reason||'ตรวจสอบแล้ว')}</small></span><span class="pdf-state ${x.status}">${x.status==='saved'?'บันทึกสำเร็จ':x.status==='duplicate'?'ตรวจซ้ำ':x.status==='skipped'?'ข้าม':'รอตรวจทาน'}</span>${x.status==='review'?`<button type="button" data-review="${x.page}">ตรวจทานหน้านี้</button>`:''}</div>`).join('')}`:'';
   host.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>openReview(Number(b.dataset.review)).catch(e=>ExamUI.alert('เปิดภาพตรวจทานไม่สำเร็จ',reason(e),'error')));
  }
- async function processPdf(){
+ async function processPdf(autoMode=false){
   if(running||active)throw Error('กำลังตรวจ PDF หรือมีหน้าตรวจทานเปิดอยู่');
-  if(!S.exam)throw Error('กรุณาเลือกชุดข้อสอบก่อน');
-  if(S.exam.answerKey.length!==S.exam.numQuestions)throw Error('กรุณาบันทึกเฉลยให้ครบก่อนตรวจ PDF');
+  if(!autoMode&&!S.exam)throw Error('กรุณาเลือกชุดข้อสอบก่อน');
+  if(autoMode){stopCamera();S.exam=null;S.students=[];document.getElementById('currentPanel').classList.remove('hidden');document.getElementById('scanTools').classList.remove('hidden');document.getElementById('examTitle').textContent='ตรวจ PDF จาก QR • หลายวิชา';document.getElementById('examMeta').textContent='ใช้ QR แยกวิชาทีละหน้า และบันทึกคำตอบรอเฉลยได้';}
+  S.autoMode=!!autoMode;
   const h=await api('health');
+  if(autoMode&&h?.fix!=='4.13-autoqr-latekey')throw Error('กรุณา Deploy Apps Script V4.13 ก่อนตรวจ PDF จาก QR');
   if(h?.release!=='4.4-singlepage'||h?.onePage!==true||Number(h?.pageSize)!==100)throw Error('Apps Script API ไม่รองรับกระดาษแผ่นเดียว 1–100 ข้อ กรุณาตรวจเวอร์ชันก่อน');
   if(!window.pdfjsLib||!window.cv?.Mat||!window.jsQR)throw Error('PDF.js, OpenCV.js หรือ jsQR ยังไม่พร้อม');
-  const file=el('pdfFile').files[0];if(!file)throw Error('กรุณาเลือกไฟล์ PDF');
+  const file=el(autoMode?'pdfAutoFile':'pdfFile').files[0];if(!file)throw Error('กรุณาเลือกไฟล์ PDF');
   if(file.size>40*1024*1024)throw Error('ไฟล์เกิน 40 MB กรุณาแบ่งไฟล์');
-  if(!await ExamUI.confirm('ตรวจ PDF',`ตรวจทุกหน้าของ ${file.name} โดยข้ามผู้ที่ตรวจแล้ว และเปิดให้แก้เฉพาะหน้าที่ผิดพลาด`,`เริ่มตรวจ`))return;
+  if(!await ExamUI.confirm(autoMode?'ตรวจ PDF อัตโนมัติจาก QR':'ตรวจ PDF',`ตรวจทุกหน้าของ ${file.name} โดยข้ามผู้ที่ตรวจแล้ว และเปิดให้แก้เฉพาะหน้าที่ผิดพลาด`,`เริ่มตรวจ`))return;
   running=true;issues=[];renderIssues();let pdf;
   const totals={saved:0,duplicate:0,review:0};
   try{
@@ -40,14 +42,23 @@ window.OMRBatch=(()=>{
      canvas.width=Math.round(view.width);canvas.height=Math.round(view.height);
      ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
      await page.render({canvasContext:ctx,viewport:view}).promise;
+     if(autoMode){
+       const probe=omrReadFrame(canvas,null);
+       if(!probe?.qrExam)throw Error('ไม่พบ QR ชุดข้อสอบ • กรุณาเลือกวิชาแล้วตรวจทานหน้านี้ในโหมดปกติ');
+       if(!S.exam||S.exam.examId!==probe.qrExam){
+         const resolved=await api('resolveQr',{examId:probe.qrExam});
+         S.students=resolved.students;delete resolved.students;S.exam=resolved;
+       }
+       item.exam=S.exam;item.students=S.students;item.autoMode=autoMode;
+     }
      const read=omrReadFrame(canvas,S.exam);
      if(!read)throw Error('ไม่พบจุดมาร์กครบ 4 มุม — กดตรวจทานเพื่อปรับตำแหน่ง');
-     item.read=read;
+     item.exam=S.exam;item.students=S.students;item.autoMode=autoMode;item.read=read;
      if(read.uncertain.length)throw Error('คำตอบไม่ชัด/ฝนหลายตัวเลือก ข้อ '+read.uncertain.join(', '));
      if(!read.answers.some(Boolean))throw Error('อ่านคำตอบว่างทั้งหมด');
      const state=await handleOMRRead(read,true);
      if(state.status==='saved'||state.status==='duplicate'){
-      item.status=state.status;item.reason=state.status==='saved'?`คะแนน ${state.score}`:'รายการนี้ตรวจแล้ว';
+      item.status=state.status;item.reason=state.status==='saved'?(S.exam.answerKey.length?'คะแนน '+state.score:'บันทึกคำตอบแล้ว • รอเฉลย'):'รายการนี้ตรวจแล้ว';
       totals[state.status]++;
      }else throw Error('ระบบยังไม่ยืนยันการบันทึก');
     }catch(e){item.reason=reason(e);item.status='review';totals.review++;}
@@ -67,6 +78,8 @@ window.OMRBatch=(()=>{
   if(running||active)return;
   const item=issues.find(x=>x.page===page);if(!item||item.status!=='review')return;
   if(!item.image)throw Error('ไม่มีภาพหน้านี้ในหน่วยความจำ กรุณาเลือก PDF ใหม่');
+  if(!item.exam)throw Error('ยังอ่าน QR ไม่ได้ จึงไม่ทราบชุดข้อสอบของหน้านี้ กรุณากลับไปเลือกชุดข้อสอบแล้วตรวจ PDF แบบปกติ');
+  S.exam=item.exam;S.students=item.students;S.autoMode=!!item.autoMode;
   active=true;
   const overlay=document.createElement('div');overlay.className='pdf-review-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
   overlay.innerHTML=`<div class="pdf-review-panel"><header><strong>ตรวจทาน PDF หน้า ${page}</strong><button type="button" id="pdfClose" class="secondary">ปิด</button></header>
@@ -89,7 +102,7 @@ window.OMRBatch=(()=>{
     answers.forEach((a,i)=>{
      const j=choices.indexOf(a);if(j<0)return;
      const pt=layout.position(i,j);ctx.beginPath();ctx.arc(pt.x*4,pt.y*4,(layout.radius+1.1)*4,0,2*Math.PI);
-     ctx.lineWidth=4.1;ctx.strokeStyle=uncertain.has(i+1)?'#eab308':a===key[i]?'#16a34a':'#dc2626';ctx.stroke();
+     ctx.lineWidth=4.1;ctx.strokeStyle=uncertain.has(i+1)?'#eab308':!key.length?'#2563eb':a===key[i]?'#16a34a':'#dc2626';ctx.stroke();
     });
     uncertain.forEach(q=>{if(answers[q-1])return;const pt=layout.position(q-1,0);ctx.strokeStyle='#eab308';ctx.lineWidth=3.5;ctx.strokeRect((pt.x-13)*4,(pt.y-4)*4,(12+choices.length*layout.choicePitch)*4,8*4)});
     overlay.querySelector('#pdfMarkHandles').style.display='none';
@@ -115,7 +128,7 @@ window.OMRBatch=(()=>{
    }updateScore()
   }
   function updateScore(){const correct=answers.filter((a,i)=>a&&a===key[i]).length;
-   overlay.querySelector('#pdfRepairStatus').textContent=`อ่านแล้ว ${answers.filter(Boolean).length}/${answers.length} ข้อ • คะแนนที่คาด ${correct}/${answers.length} • ข้อรอยืนยัน ${uncertain.size}`;
+   overlay.querySelector('#pdfRepairStatus').textContent=`อ่านแล้ว ${answers.filter(Boolean).length}/${answers.length} ข้อ • ${key.length?'คะแนนที่คาด '+correct+'/'+answers.length:'รอเฉลย'} • ข้อรอยืนยัน ${uncertain.size}`;
    overlay.querySelector('#pdfSaveCorrection').disabled=!read||uncertain.size>0||!answers.some(Boolean)}
   const studentSel=overlay.querySelector('#pdfStudent');
   S.students.forEach(s=>{const o=document.createElement('option');o.value=s.studentId;o.textContent=`${s.room} ${s.studentId} ${s.name}`;studentSel.appendChild(o)});
@@ -136,16 +149,16 @@ window.OMRBatch=(()=>{
    if(!read||uncertain.size)throw Error('โปรดแก้ไขข้อที่อ่านไม่ชัดให้ครบก่อน');
    const studentId=studentSel.value;if(!studentId){await ExamUI.alert('ต้องเลือกนักเรียน','กรุณาเลือกนักเรียนที่ตรงกับกระดาษ','warning');return}
    const who=S.students.find(s=>String(s.studentId)===String(studentId));
-   if(!await ExamUI.confirm('ยืนยันข้อมูลและคะแนน',`${who?.name||studentId} (${who?.room||''})\nคะแนน ${answers.filter((a,i)=>a===key[i]).length}/${answers.length}\nจะบันทึกเฉพาะหน้า PDF ${page}`, 'บันทึกคะแนน'))return;
+   if(!await ExamUI.confirm('ยืนยันข้อมูลและคะแนน',`${who?.name||studentId} (${who?.room||''})\n${key.length?'คะแนน '+answers.filter((a,i)=>a===key[i]).length+'/'+answers.length:'บันทึกคำตอบรอเฉลย'}\nจะบันทึกเฉพาะหน้า PDF ${page}`, 'บันทึกคะแนน'))return;
    const button=overlay.querySelector('#pdfSaveCorrection');button.disabled=true;
    try{
-    let result=await api('scan',{examId:S.exam.examId,studentId,pageNo:1,answers});
+    let result=await api('scan',{examId:S.exam.examId,studentId,pageNo:1,answers,...(S.autoMode?{qrAuto:true,qrExam:read.qrExam,qrStudent:read.qrStudent}:{})});
     if(result.duplicate){
      if(!await ExamUI.confirm('มีผลตรวจอยู่แล้ว',`นักเรียน ${who?.name||studentId} มีคะแนนเดิม ${result.previous?.score} ต้องการตรวจซ้ำและแทนที่หรือไม่`,'ตรวจซ้ำ')){button.disabled=false;return}
-     result=await api('scan',{examId:S.exam.examId,studentId,pageNo:1,answers,replace:true,expectedRevision:result.previous.revision});
+     result=await api('scan',{examId:S.exam.examId,studentId,pageNo:1,answers,replace:true,expectedRevision:result.previous.revision,...(S.autoMode?{qrAuto:true,qrExam:read.qrExam,qrStudent:read.qrStudent}:{})});
     }
     if(!result.complete)throw Error('API ยังไม่ยืนยันคะแนนรวม ไม่บันทึกเป็นผลสำเร็จ');
-    item.status='saved';item.reason=`${who?.name||studentId} • ${result.score}/${result.fullScore}`;delete item.image;delete item.read;
+    item.status='saved';item.reason=`${who?.name||studentId} • ${result.awaitingKey?'รอเฉลย':result.score+'/'+result.fullScore}`;delete item.image;delete item.read;
     progress(`แก้ไข PDF หน้า ${page} สำเร็จ • ${item.reason}`);close();await ExamUI.alert('บันทึกคะแนนสำเร็จ',item.reason,'success');
    }catch(e){button.disabled=false;await ExamUI.alert('บันทึกไม่สำเร็จ',reason(e),'error')}
   };
